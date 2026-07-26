@@ -1,0 +1,61 @@
+spring:
+  application:
+    name: devbrew-be
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/devbrew}
+    username: ${DB_USERNAME:devbrew}
+    password: ${DB_PASSWORD:devbrew}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+logging:
+  level:
+    com.devbrew: DEBUG
+    org.flywaydb: INFO
+
+devbrew:
+  slack:
+    webhook-url: ${SLACK_WEBHOOK_URL:}
+  claude:
+    api-key: ${CLAUDE_API_KEY:}
+    base-url: https://api.anthropic.com
+    batch-poll-interval-ms: 30000
+    batch-max-polls: 20
+  gemini:
+    api-key: ${GEMINI_API_KEY:}
+    base-url: https://generativelanguage.googleapis.com
+  pipeline:
+    reddit:
+      subreddits: SaaS,entrepreneur,startups,webdev,programming
+      user-agent: devbrew/1.0 (idea-curator)
+    github:
+      pat: ${GITHUB_PAT:}
+      min-stars: 100
+      max-stars: 2000
+    viral:
+      seed-topics:
+        - browser-extension
+        - cli-tool
+        - discord-bot
+        - notion-integration
+        - chrome-extension
