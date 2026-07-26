@@ -15,6 +15,7 @@ class GeminiIdeaGenerator(
     private val webClient: WebClient,
     private val props: DevBrewProperties,
     private val objectMapper: ObjectMapper,
+    private val adminStatsService: com.devbrew.admin.AdminStatsService,
 ) : IdeaGenerator {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -36,6 +37,12 @@ class GeminiIdeaGenerator(
             .retrieve()
             .bodyToMono(Map::class.java)
             .block() as Map<String, Any>? ?: throw RuntimeException("Empty response from Gemini")
+
+        (response["usageMetadata"] as? Map<*, *>)?.let { usage ->
+            val prompt = (usage["promptTokenCount"] as? Number)?.toInt() ?: 0
+            val completion = (usage["candidatesTokenCount"] as? Number)?.toInt() ?: 0
+            runCatching { adminStatsService.recordGeminiUsage("generate", prompt, completion) }
+        }
 
         return parseResponse(response, signal)
     }

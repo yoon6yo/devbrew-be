@@ -14,6 +14,7 @@ class GeminiIdeaRater(
     private val webClient: WebClient,
     private val props: DevBrewProperties,
     private val objectMapper: ObjectMapper,
+    private val adminStatsService: com.devbrew.admin.AdminStatsService,
 ) : IdeaRater {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -66,6 +67,13 @@ class GeminiIdeaRater(
                         monetization * 0.20 + trend * 0.10).toInt().coerceIn(1, 10).toShort()
 
                 val reason = parsed["reason"] as String
+
+                (response["usageMetadata"] as? Map<*, *>)?.let { usage ->
+                    val prompt = (usage["promptTokenCount"] as? Number)?.toInt() ?: 0
+                    val completion = (usage["candidatesTokenCount"] as? Number)?.toInt() ?: 0
+                    runCatching { adminStatsService.recordGeminiUsage("rate", prompt, completion) }
+                }
+
                 idea.id!! to ScoreResult(weighted, marketFit, novelty, feasibility, monetization, trend, reason)
             }
     }

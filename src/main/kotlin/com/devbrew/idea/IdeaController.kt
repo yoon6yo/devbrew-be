@@ -22,7 +22,10 @@ import org.springframework.web.bind.annotation.*
 @RestController
 @RequestMapping("/api/ideas")
 @Tag(name = "Ideas", description = "아이디어 조회 및 관리")
-class IdeaController(private val ideaService: IdeaService) {
+class IdeaController(
+    private val ideaService: IdeaService,
+    private val adminStatsService: com.devbrew.admin.AdminStatsService,
+) {
 
     @GetMapping
     @Operation(
@@ -43,7 +46,10 @@ class IdeaController(private val ideaService: IdeaService) {
         @Parameter(description = "아이디어 상태 필터 (PENDING / SCORED / NOTIFIED / REJECTED). 생략 시 전체 조회")
         @RequestParam(required = false) status: IdeaStatus?,
         @ParameterObject @PageableDefault(size = 20, sort = ["score"], direction = Sort.Direction.DESC) pageable: Pageable,
-    ): Page<IdeaDto> = ideaService.getPage(status, pageable).map { it.toDto() }
+    ): Page<IdeaDto> {
+        adminStatsService.incrementPageViews()
+        return ideaService.getPage(status, pageable).map { it.toDto() }
+    }
 
     @GetMapping("/{id}")
     @Operation(summary = "특정 아이디어 단건 조회", description = "인증 불필요.")
