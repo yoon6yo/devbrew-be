@@ -8,6 +8,7 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.web.bind.annotation.*
 
@@ -59,6 +60,17 @@ class AuthController(
         rateLimiter.recordSuccess(emailKey)
         return ResponseEntity.ok(LoginResponse(jwtTokenProvider.generate(user.id, user.email, user.role)))
     }
+
+    @GetMapping("/me")
+    fun me(): ResponseEntity<MeResponse> {
+        val auth = SecurityContextHolder.getContext().authentication
+        if (auth == null || !auth.isAuthenticated || auth.principal == "anonymousUser") {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        }
+        val email = auth.name
+        val role = auth.authorities.firstOrNull()?.authority?.removePrefix("ROLE_") ?: "USER"
+        return ResponseEntity.ok(MeResponse(email = email, role = role))
+    }
 }
 
 data class RegisterRequest(
@@ -68,3 +80,4 @@ data class RegisterRequest(
 
 data class LoginRequest(val email: String = "", val password: String = "")
 data class LoginResponse(val token: String)
+data class MeResponse(val email: String, val role: String)
