@@ -9,6 +9,8 @@ import com.github.tomakehurst.wiremock.client.WireMock.aResponse
 import com.github.tomakehurst.wiremock.client.WireMock.post
 import com.github.tomakehurst.wiremock.client.WireMock.urlPathMatching
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration
+import io.mockk.every
+import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
@@ -19,6 +21,7 @@ class GeminiIdeaGeneratorTest {
 
     private lateinit var wireMock: WireMockServer
     private lateinit var generator: GeminiIdeaGenerator
+    private val geminiDailyBudget = mockk<GeminiDailyBudget>(relaxed = true)
 
     @BeforeEach
     fun setUp() {
@@ -31,7 +34,8 @@ class GeminiIdeaGeneratorTest {
                 baseUrl = "http://localhost:${wireMock.port()}",
             )
         )
-        generator = GeminiIdeaGenerator(WebClient.builder().build(), props, ObjectMapper())
+        every { geminiDailyBudget.isDailyBudgetExceeded() } returns false
+        generator = GeminiIdeaGenerator(WebClient.builder().build(), props, ObjectMapper(), geminiDailyBudget)
     }
 
     @AfterEach

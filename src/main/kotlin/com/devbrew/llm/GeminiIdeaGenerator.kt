@@ -15,11 +15,23 @@ class GeminiIdeaGenerator(
     private val webClient: WebClient,
     private val props: DevBrewProperties,
     private val objectMapper: ObjectMapper,
+    private val geminiDailyBudget: GeminiDailyBudget,
 ) : IdeaGenerator {
 
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun generate(signal: RawSignal): Idea {
+        if (geminiDailyBudget.isDailyBudgetExceeded()) {
+            log.warn("Daily Gemini budget ({}KRW) exceeded — using signal fallback", props.gemini.dailyBudgetKrw)
+            return Idea(
+                title = signal.title,
+                description = signal.body,
+                sourceTrack = signal.track,
+                sourceUrl = signal.url,
+                rawSignal = signal.body,
+            )
+        }
+
         val uri = "${props.gemini.baseUrl}/v1beta/models/${props.gemini.model}:generateContent"
 
         @Suppress("UNCHECKED_CAST")
@@ -36,6 +48,12 @@ class GeminiIdeaGenerator(
             .retrieve()
             .bodyToMono(Map::class.java)
             .block() as Map<String, Any>? ?: throw RuntimeException("Empty response from Gemini")
+
+        (response["usageMetadata"] as? Map<*, *>)?.let { usage ->
+            val prompt = (usage["promptTokenCount"] as? Number)?.toInt() ?: 0
+            val completion = (usage["candidatesTokenCount"] as? Number)?.toInt() ?: 0
+            runCatching { geminiDailyBudget.recordUsage(prompt, completion) }
+        }
 
         return parseResponse(response, signal)
     }

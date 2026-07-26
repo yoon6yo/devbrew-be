@@ -8,6 +8,10 @@ import com.devbrew.llm.IdeaRater
 import com.devbrew.pipeline.collector.IdeaCollector
 import com.devbrew.slack.SlackNotifier
 import org.slf4j.LoggerFactory
+import org.springframework.boot.context.event.ApplicationReadyEvent
+import org.springframework.context.event.EventListener
+import org.springframework.data.domain.Pageable
+import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -21,6 +25,17 @@ class PipelineScheduler(
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
+
+    @EventListener(ApplicationReadyEvent::class)
+    fun onApplicationReady() {
+        if (ideaService.getPage(null, Pageable.ofSize(1)).isEmpty) {
+            log.info("No ideas in DB at startup — triggering initial pipeline run")
+            runPipeline()
+        }
+    }
+
+    @Async
+    fun triggerAsync() = runPipeline()
 
     // Run daily at 09:00 KST (00:00 UTC)
     @Scheduled(cron = "0 0 0 * * *")

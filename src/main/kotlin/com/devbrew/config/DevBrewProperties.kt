@@ -23,6 +23,8 @@ data class DevBrewProperties(
         val apiKey: String = "",
         val baseUrl: String = "https://generativelanguage.googleapis.com",
         val model: String = "gemini-2.5-flash-lite",
+        val dailyBudgetKrw: Int = 1000,
+        val usdToKrw: Int = 1400,
     )
 
     data class JwtProps(
