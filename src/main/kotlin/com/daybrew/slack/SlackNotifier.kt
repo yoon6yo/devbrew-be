@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
 
 @Component
-class SlackNotifier(
+open class SlackNotifier(
     private val webClient: WebClient,
     private val props: DayBrewProperties,
 ) {
@@ -19,13 +19,15 @@ class SlackNotifier(
             Regex("""^https://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/[a-zA-Z0-9]+$""")
     }
 
+    protected open fun isValidWebhookUrl(url: String): Boolean = WEBHOOK_PATTERN.matches(url)
+
     fun notifyIdea(idea: Idea) {
         val url = props.slack.webhookUrl
         if (url.isBlank()) {
             log.info("Slack webhook not configured — skipping notification for idea ${idea.id}")
             return
         }
-        if (!WEBHOOK_PATTERN.matches(url)) {
+        if (!isValidWebhookUrl(url)) {
             log.warn("Slack webhook URL failed validation — refusing to POST for idea ${idea.id}")
             return
         }

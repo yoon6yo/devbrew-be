@@ -73,8 +73,10 @@ class SlackNotifierTest {
         wireMock.verify(postRequestedFor(urlEqualTo("/services/webhook")))
     }
 
-    private fun notifierWithUrl(url: String) = SlackNotifier(
+    private fun notifierWithUrl(url: String) = object : SlackNotifier(
         WebClient.builder().build(),
         DayBrewProperties(slack = DayBrewProperties.SlackProps(webhookUrl = url))
-    )
+    ) {
+        override fun isValidWebhookUrl(url: String) = url.isNotBlank()
+    }
 }

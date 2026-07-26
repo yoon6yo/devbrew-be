@@ -3,6 +3,7 @@ package com.daybrew.idea
 import com.daybrew.admin.AdminStatsService
 import io.mockk.every
 import io.mockk.mockk
+import jakarta.servlet.http.HttpServletRequest
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -16,11 +17,16 @@ class IdeaControllerTest {
 
     private val ideaService = mockk<IdeaService>()
     private val adminStatsService = mockk<AdminStatsService>(relaxed = true)
+    private val starRateLimiter = mockk<StarRateLimiter>()
+    private val mockRequest = mockk<HttpServletRequest>()
     private lateinit var controller: IdeaController
 
     @BeforeEach
     fun setUp() {
-        controller = IdeaController(ideaService, adminStatsService)
+        controller = IdeaController(ideaService, adminStatsService, starRateLimiter)
+        every { mockRequest.getHeader("X-Real-IP") } returns null
+        every { mockRequest.remoteAddr } returns "127.0.0.1"
+        every { starRateLimiter.checkAndRecord(any()) } returns null
     }
 
     private fun idea(id: Long = 1L, score: Short = 8, starCount: Int = 3, status: IdeaStatus = IdeaStatus.NOTIFIED) =
@@ -114,7 +120,7 @@ class IdeaControllerTest {
         val updated = idea(1L, starCount = 4)
         every { ideaService.starIdea(1L, "device-fp") } returns (updated to true)
 
-        val response = controller.star(1L, "device-fp")
+        val response = controller.star(1L, "device-fp", mockRequest)
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.CREATED)
         assertThat(response.body!!.starCount).isEqualTo(4)
@@ -125,16 +131,26 @@ class IdeaControllerTest {
         val existing = idea(1L, starCount = 4)
         every { ideaService.starIdea(1L, "device-fp") } returns (existing to false)
 
-        val response = controller.star(1L, "device-fp")
+        val response = controller.star(1L, "device-fp", mockRequest)
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+    }
+
+    @Test
+    fun `star returns 429 when rate limit exceeded`() {
+        every { starRateLimiter.checkAndRecord(any()) } returns 42L
+
+        val response = controller.star(1L, "device-fp", mockRequest)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
+        assertThat(response.headers["Retry-After"]).isNotNull
     }
 
     @Test
     fun `star propagates IllegalArgumentException on invalid fingerprint`() {
         every { ideaService.starIdea(1L, "") } throws IllegalArgumentException("Invalid fingerprint")
 
-        org.assertj.core.api.Assertions.assertThatThrownBy { controller.star(1L, "") }
+        org.assertj.core.api.Assertions.assertThatThrownBy { controller.star(1L, "", mockRequest) }
             .isInstanceOf(IllegalArgumentException::class.java)
     }
 
@@ -143,7 +159,7 @@ class IdeaControllerTest {
         val updated = idea(1L, starCount = 10)
         every { ideaService.starIdea(1L, "fp-xyz") } returns (updated to true)
 
-        val response = controller.star(1L, "fp-xyz")
+        val response = controller.star(1L, "fp-xyz", mockRequest)
 
         assertThat(response.body!!.starCount).isEqualTo(10)
     }
