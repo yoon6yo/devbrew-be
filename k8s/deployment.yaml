@@ -59,11 +59,6 @@ spec:
                 secretKeyRef:
                   name: devbrew-secrets
                   key: slack-webhook-url
-            - name: CLAUDE_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: devbrew-secrets
-                  key: claude-api-key
             - name: GEMINI_API_KEY
               valueFrom:
                 secretKeyRef:

@@ -46,11 +46,6 @@ devbrew:
     password: ${ADMIN_PASSWORD:}
   slack:
     webhook-url: ${SLACK_WEBHOOK_URL:}
-  claude:
-    api-key: ${CLAUDE_API_KEY:}
-    base-url: https://api.anthropic.com
-    batch-poll-interval-ms: 30000
-    batch-max-polls: 20
   gemini:
     api-key: ${GEMINI_API_KEY:}
     base-url: https://generativelanguage.googleapis.com
