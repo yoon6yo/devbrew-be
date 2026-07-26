@@ -1,5 +1,7 @@
 package com.daybrew.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import io.netty.channel.ChannelOption
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
@@ -12,6 +14,9 @@ import java.time.Duration
 @Configuration
 @EnableConfigurationProperties(DayBrewProperties::class)
 class LlmConfig {
+
+    @Bean
+    fun objectMapper(): ObjectMapper = ObjectMapper().apply { registerKotlinModule() }
 
     @Bean
     fun webClient(): WebClient {
