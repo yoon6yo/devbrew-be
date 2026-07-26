@@ -43,11 +43,21 @@ class JwtTokenProvider(private val props: DayBrewProperties) {
     }.getOrDefault(false)
 
     fun getClaims(token: String): JwtClaims {
-        val payload = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
+        val payload = Jwts.parser()
+            .verifyWith(key)
+            .requireIssuer(props.jwt.issuer)
+            .build()
+            .parseSignedClaims(token)
+            .payload
+        if (!payload.audience.contains(props.jwt.audience))
+            throw io.jsonwebtoken.JwtException("Invalid audience")
         return JwtClaims(
-            userId = (payload["userId"] as Number).toLong(),
-            email = payload.subject,
-            role = UserRole.valueOf(payload["role"] as String),
+            userId = (payload["userId"] as? Number)?.toLong()
+                ?: throw io.jsonwebtoken.JwtException("Missing or invalid userId claim"),
+            email = payload.subject
+                ?: throw io.jsonwebtoken.JwtException("Missing subject"),
+            role = runCatching { UserRole.valueOf(payload["role"] as? String ?: "") }
+                .getOrElse { throw io.jsonwebtoken.JwtException("Invalid role claim") },
         )
     }
 }

@@ -21,30 +21,30 @@ class StarRateLimiter {
     /** @return null if allowed; Retry-After seconds (>=1) if rate-limited */
     fun checkAndRecord(ip: String): Long? {
         val now = System.currentTimeMillis()
-        val deque = store.computeIfAbsent(ip) { ArrayDeque() }
-        synchronized(deque) {
-            while (deque.isNotEmpty() && now - deque.peekFirst() >= WINDOW_MS) {
-                deque.pollFirst()
-            }
+        var result: Long? = null
+        store.compute(ip) { _, existing ->
+            val deque = existing ?: ArrayDeque()
+            while (deque.isNotEmpty() && now - deque.peekFirst() >= WINDOW_MS) deque.pollFirst()
             if (deque.size >= MAX_REQUESTS) {
-                val oldest = deque.peekFirst()
-                val retryAfterMs = WINDOW_MS - (now - oldest)
-                return ((retryAfterMs + 999) / 1000).coerceAtLeast(1)
+                val retryAfterMs = WINDOW_MS - (now - deque.peekFirst())
+                result = ((retryAfterMs + 999) / 1000).coerceAtLeast(1)
+                deque
+            } else {
+                deque.addLast(now)
+                deque
             }
-            deque.addLast(now)
-            return null
         }
+        return result
     }
 
     @Scheduled(fixedDelay = 60_000)
     fun evictExpired() {
         val now = System.currentTimeMillis()
-        store.entries.removeIf { (_, deque) ->
-            synchronized(deque) {
-                while (deque.isNotEmpty() && now - deque.peekFirst() >= WINDOW_MS) {
-                    deque.pollFirst()
-                }
-                deque.isEmpty()
+        for (key in store.keys.toList()) {
+            store.compute(key) { _, deque ->
+                if (deque == null) return@compute null
+                while (deque.isNotEmpty() && now - deque.peekFirst() >= WINDOW_MS) deque.pollFirst()
+                if (deque.isEmpty()) null else deque
             }
         }
     }

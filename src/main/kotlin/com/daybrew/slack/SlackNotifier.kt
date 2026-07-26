@@ -5,6 +5,8 @@ import com.daybrew.idea.Idea
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
+import reactor.core.publisher.Mono
+import java.time.Duration
 
 @Component
 open class SlackNotifier(
@@ -16,7 +18,7 @@ open class SlackNotifier(
 
     companion object {
         private val WEBHOOK_PATTERN =
-            Regex("""^https://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/[a-zA-Z0-9]+$""")
+            Regex("""^https://hooks\.slack\.com/services/[A-Za-z0-9]+/[A-Za-z0-9]+/[A-Za-z0-9]+$""")
     }
 
     protected open fun isValidWebhookUrl(url: String): Boolean = WEBHOOK_PATTERN.matches(url)
@@ -37,6 +39,11 @@ open class SlackNotifier(
             .bodyValue(buildPayload(idea))
             .retrieve()
             .bodyToMono(String::class.java)
+            .timeout(Duration.ofSeconds(5))
+            .onErrorResume { ex ->
+                log.warn("Slack notification failed for idea ${idea.id}: ${ex.message}")
+                Mono.empty()
+            }
             .block()
 
         log.info("Slack notification sent for idea ${idea.id}: ${idea.title}")
