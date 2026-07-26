@@ -21,6 +21,8 @@ data class DayBrewProperties(
     data class JwtProps(
         val secret: String = "daybrew-secret-key-change-in-production-32ch",
         val expirationMs: Long = 86_400_000,
+        val issuer: String = "daybrew",
+        val audience: String = "daybrew-users",
     )
 
     data class AdminProps(

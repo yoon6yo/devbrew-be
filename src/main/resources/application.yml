@@ -65,6 +65,8 @@ daybrew:
   jwt:
     secret: ${JWT_SECRET:daybrew-secret-key-change-in-production-32ch}
     expiration-ms: 86400000
+    issuer: ${JWT_ISSUER:daybrew}
+    audience: ${JWT_AUDIENCE:daybrew-users}
   admin:
     username: ${ADMIN_USERNAME:admin}
     password: ${ADMIN_PASSWORD:}

@@ -21,6 +21,8 @@ class JwtTokenProvider(private val props: DayBrewProperties) {
     }
 
     fun generate(userId: Long, email: String, role: UserRole): String = Jwts.builder()
+        .issuer(props.jwt.issuer)
+        .audience().add(props.jwt.audience).and()
         .subject(email)
         .claim("userId", userId)
         .claim("role", role.name)
@@ -30,8 +32,14 @@ class JwtTokenProvider(private val props: DayBrewProperties) {
         .compact()
 
     fun validate(token: String): Boolean = runCatching {
-        Jwts.parser().verifyWith(key).build().parseSignedClaims(token)
-        true
+        Jwts.parser()
+            .verifyWith(key)
+            .requireIssuer(props.jwt.issuer)
+            .build()
+            .parseSignedClaims(token)
+            .payload
+            .audience
+            .contains(props.jwt.audience)
     }.getOrDefault(false)
 
     fun getClaims(token: String): JwtClaims {
