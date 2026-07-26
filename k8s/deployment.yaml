@@ -158,3 +158,50 @@ spec:
       targetPort: 8080
       nodePort: 30081
   type: NodePort
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: daybrew-fe
+  namespace: daybrew
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: daybrew.duckdns.org
+      http:
+        paths:
+          - path: /api/
+            pathType: Prefix
+            backend:
+              service:
+                name: daybrew
+                port:
+                  number: 80
+          - path: /oauth2/authorization/
+            pathType: Prefix
+            backend:
+              service:
+                name: daybrew
+                port:
+                  number: 80
+          - path: /login/oauth2/
+            pathType: Prefix
+            backend:
+              service:
+                name: daybrew
+                port:
+                  number: 80
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: daybrew-fe
+                port:
+                  number: 80
+  tls:
+    - hosts:
+        - daybrew.duckdns.org
+      secretName: daybrew-tls
