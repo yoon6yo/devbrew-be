@@ -9,6 +9,7 @@ data class DayBrewProperties(
     val jwt: JwtProps = JwtProps(),
     val admin: AdminProps = AdminProps(),
     val frontend: FrontendProps = FrontendProps(),
+    val pipeline: PipelineProps = PipelineProps(),
 ) {
     data class SlackProps(val webhookUrl: String = "")
 
@@ -34,4 +35,14 @@ data class DayBrewProperties(
     data class FrontendProps(
         val url: String = "http://localhost:5173",
     )
+
+    data class PipelineProps(
+        val viral: ViralProps = ViralProps(),
+    ) {
+        data class ViralProps(
+            val seedTopics: List<String> = listOf(
+                "browser-extension", "cli-tool", "discord-bot", "notion-integration", "chrome-extension"
+            ),
+        )
+    }
 }
