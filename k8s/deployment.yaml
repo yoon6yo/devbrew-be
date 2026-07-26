@@ -70,6 +70,54 @@ spec:
                 secretKeyRef:
                   name: daybrew-secrets
                   key: github-pat
+            - name: ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: admin-email
+                  optional: true
+            - name: FRONTEND_URL
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: frontend-url
+                  optional: true
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: google-client-id
+                  optional: true
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: google-client-secret
+                  optional: true
+            - name: KAKAO_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: kakao-client-id
+                  optional: true
+            - name: KAKAO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: kakao-client-secret
+                  optional: true
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: github-client-id
+                  optional: true
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: github-client-secret
+                  optional: true
           resources:
             requests:
               memory: "384Mi"

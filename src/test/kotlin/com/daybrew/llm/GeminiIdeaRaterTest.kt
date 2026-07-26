@@ -40,8 +40,9 @@ class GeminiIdeaRaterTest {
     @AfterEach
     fun tearDown() = wireMock.stop()
 
-    private fun geminiResponse(score: Int, reason: String): String {
-        val text = "{\\\"score\\\":$score,\\\"reason\\\":\\\"$reason\\\"}"
+    private fun geminiResponse(subScore: Int, reason: String): String {
+        val text = "{\\\"market_fit\\\":$subScore,\\\"novelty\\\":$subScore,\\\"feasibility\\\":$subScore," +
+                "\\\"monetization\\\":$subScore,\\\"trend\\\":$subScore,\\\"reason\\\":\\\"$reason\\\"}"
         return """{"candidates":[{"content":{"parts":[{"text":"$text"}]}}]}"""
     }
 

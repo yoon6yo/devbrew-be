@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component
 import java.util.Date
 import javax.crypto.SecretKey
 
+data class JwtClaims(val userId: Long, val email: String, val role: UserRole)
+
 @Component
 class JwtTokenProvider(private val props: DayBrewProperties) {
 
@@ -14,8 +16,10 @@ class JwtTokenProvider(private val props: DayBrewProperties) {
         Keys.hmacShaKeyFor(props.jwt.secret.toByteArray(Charsets.UTF_8))
     }
 
-    fun generate(subject: String): String = Jwts.builder()
-        .subject(subject)
+    fun generate(userId: Long, email: String, role: UserRole): String = Jwts.builder()
+        .subject(email)
+        .claim("userId", userId)
+        .claim("role", role.name)
         .issuedAt(Date())
         .expiration(Date(System.currentTimeMillis() + props.jwt.expirationMs))
         .signWith(key)
@@ -26,6 +30,12 @@ class JwtTokenProvider(private val props: DayBrewProperties) {
         true
     }.getOrDefault(false)
 
-    fun getSubject(token: String): String =
-        Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload.subject
+    fun getClaims(token: String): JwtClaims {
+        val payload = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).payload
+        return JwtClaims(
+            userId = (payload["userId"] as Number).toLong(),
+            email = payload.subject,
+            role = UserRole.valueOf(payload["role"] as String),
+        )
+    }
 }

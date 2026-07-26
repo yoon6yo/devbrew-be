@@ -15,7 +15,7 @@ import java.time.OffsetDateTime
 class IdeaControllerTest {
 
     private val ideaService = mockk<IdeaService>()
-    private val adminStatsService = mockk<AdminStatsService>()
+    private val adminStatsService = mockk<AdminStatsService>(relaxed = true)
     private lateinit var controller: IdeaController
 
     @BeforeEach

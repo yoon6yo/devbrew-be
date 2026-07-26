@@ -3,8 +3,6 @@ name: CI/CD — BE
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main, develop]
 
 env:
   REGISTRY: ghcr.io

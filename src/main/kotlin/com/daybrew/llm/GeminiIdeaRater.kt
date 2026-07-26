@@ -63,8 +63,9 @@ class GeminiIdeaRater(
                 val trend        = score("trend")
 
                 // Weighted: market_fit 30%, novelty 20%, feasibility 20%, monetization 20%, trend 10%
-                val weighted = (marketFit * 0.30 + novelty * 0.20 + feasibility * 0.20 +
-                        monetization * 0.20 + trend * 0.10).toInt().coerceIn(1, 10).toShort()
+                // Integer arithmetic to avoid floating-point rounding errors
+                val weighted = ((marketFit.toInt() * 30 + novelty.toInt() * 20 + feasibility.toInt() * 20 +
+                        monetization.toInt() * 20 + trend.toInt() * 10) / 100).coerceIn(1, 10).toShort()
 
                 val reason = parsed["reason"] as String
 
