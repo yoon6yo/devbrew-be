@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.util.concurrent.CompletableFuture
 
 @RestController
 @RequestMapping("/api/admin")
@@ -31,7 +30,7 @@ class AdminStatsController(
     @ApiResponse(responseCode = "202", description = "파이프라인 시작됨")
     @PostMapping("/pipeline/trigger")
     fun triggerPipeline(): ResponseEntity<Map<String, String>> {
-        CompletableFuture.runAsync { pipelineScheduler.runPipeline() }
+        pipelineScheduler.runPipeline()
         return ResponseEntity.accepted().body(mapOf("message" to "Pipeline started"))
     }
 }

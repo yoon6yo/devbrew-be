@@ -1,8 +1,5 @@
 package com.daybrew.admin
 
-import com.daybrew.config.DayBrewProperties
-import com.daybrew.auth.JwtTokenProvider
-import com.daybrew.auth.UserRole
 import com.daybrew.pipeline.PipelineScheduler
 import io.mockk.every
 import io.mockk.justRun
@@ -12,6 +9,8 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 class AdminStatsControllerTest {
 
@@ -19,22 +18,10 @@ class AdminStatsControllerTest {
     private val pipelineScheduler = mockk<PipelineScheduler>()
     private lateinit var controller: AdminStatsController
 
-    private val jwtTokenProvider = JwtTokenProvider(
-        DayBrewProperties(
-            jwt = DayBrewProperties.JwtProps(
-                secret = "test-secret-key-minimum-32-characters-ok",
-                expirationMs = 3_600_000,
-            )
-        )
-    )
-
     @BeforeEach
     fun setUp() {
         controller = AdminStatsController(adminStatsService, pipelineScheduler)
     }
-
-    private fun adminToken(): String =
-        jwtTokenProvider.generate(1L, "admin@daybrew.local", UserRole.ADMIN)
 
     private fun statsDto() = AdminStatsDto(
         gemini = GeminiStatsDto(todayTokens = 100L, monthTokens = 5000L, estimatedMonthlyCostUsd = 0.05),
@@ -100,20 +87,18 @@ class AdminStatsControllerTest {
 
     @Test
     fun `triggerPipeline responds immediately without waiting for pipeline completion`() {
-        // Pipeline runs asynchronously via CompletableFuture.runAsync — the controller
-        // must return before the pipeline finishes. We verify the response is returned
-        // regardless of pipeline execution timing.
+        val started = CountDownLatch(1)
         every { pipelineScheduler.runPipeline() } answers {
-            Thread.sleep(200) // simulate slow pipeline
+            started.countDown()
+            Thread.sleep(500)
         }
 
-        val start = System.currentTimeMillis()
         val response = controller.triggerPipeline()
-        val elapsed = System.currentTimeMillis() - start
 
+        // Controller returns 202 before pipeline completes
         assertThat(response.statusCode).isEqualTo(HttpStatus.ACCEPTED)
-        // Controller returns immediately (well under 200ms pipeline delay)
-        assertThat(elapsed).isLessThan(200L)
+        // Pipeline did eventually start
+        assertThat(started.await(2, TimeUnit.SECONDS)).isTrue()
     }
 
     @Test

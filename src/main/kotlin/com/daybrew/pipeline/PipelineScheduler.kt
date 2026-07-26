@@ -8,6 +8,7 @@ import com.daybrew.llm.IdeaRater
 import com.daybrew.pipeline.collector.IdeaCollector
 import com.daybrew.slack.SlackNotifier
 import org.slf4j.LoggerFactory
+import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
 
@@ -23,6 +24,7 @@ class PipelineScheduler(
     private val log = LoggerFactory.getLogger(javaClass)
 
     // Run daily at 09:00 KST (00:00 UTC)
+    @Async
     @Scheduled(cron = "0 0 0 * * *")
     fun runPipeline() {
         log.info("Pipeline started")
