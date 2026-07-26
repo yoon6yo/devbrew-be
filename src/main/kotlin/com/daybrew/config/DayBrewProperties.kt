@@ -8,6 +8,7 @@ data class DayBrewProperties(
     val gemini: GeminiProps = GeminiProps(),
     val jwt: JwtProps = JwtProps(),
     val admin: AdminProps = AdminProps(),
+    val frontend: FrontendProps = FrontendProps(),
 ) {
     data class SlackProps(val webhookUrl: String = "")
 
@@ -25,5 +26,10 @@ data class DayBrewProperties(
     data class AdminProps(
         val username: String = "admin",
         val password: String = "",
+        val email: String = "admin@daybrew.local",
+    )
+
+    data class FrontendProps(
+        val url: String = "http://localhost:5173",
     )
 }
