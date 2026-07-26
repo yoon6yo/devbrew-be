@@ -64,6 +64,6 @@ jobs:
           username: ${{ secrets.K8S_SSH_USER }}
           key: ${{ secrets.K8S_SSH_KEY }}
           script: |
-            kubectl apply -f https://raw.githubusercontent.com/yoon6yo/DevBrew/main/k8s/deployment.yaml
+            kubectl apply -f https://raw.githubusercontent.com/yoon6yo/devbrew-be/main/k8s/deployment.yaml
             kubectl rollout restart deployment/devbrew -n devbrew
             kubectl rollout status deployment/devbrew -n devbrew --timeout=300s
