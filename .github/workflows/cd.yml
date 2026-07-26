@@ -1,0 +1,51 @@
+name: CD — Deploy (BE)
+
+on:
+  workflow_run:
+    workflows: ["CI — Build & Push (BE)"]
+    branches: [main]
+    types: [completed]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    name: Deploy to k3s via SSH
+    runs-on: ubuntu-latest
+    environment: production
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Patch image tag in manifest
+        run: |
+          SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
+          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHA}"
+          sed -i "s|image: .*|image: ${IMAGE}|" k8s/deployment.yaml
+
+      - name: Copy manifest to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.K8S_SSH_HOST }}
+          port: ${{ secrets.K8S_SSH_PORT || 22 }}
+          username: ${{ secrets.K8S_SSH_USER }}
+          key: ${{ secrets.K8S_SSH_KEY }}
+          source: "k8s/deployment.yaml"
+          target: "/tmp/devbrew-deploy"
+          strip_components: 1
+
+      - name: Apply manifest and wait for rollout
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.K8S_SSH_HOST }}
+          port: ${{ secrets.K8S_SSH_PORT || 22 }}
+          username: ${{ secrets.K8S_SSH_USER }}
+          key: ${{ secrets.K8S_SSH_KEY }}
+          script: |
+            kubectl apply -f /tmp/devbrew-deploy/deployment.yaml
+            kubectl rollout status deployment/devbrew -n devbrew --timeout=300s
+            rm -f /tmp/devbrew-deploy/deployment.yaml
