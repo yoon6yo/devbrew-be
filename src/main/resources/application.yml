@@ -15,10 +15,6 @@ spring:
             authorization-grant-type: authorization_code
             redirect-uri: "{baseUrl}/login/oauth2/code/{registrationId}"
             scope: account_email, profile_nickname
-          github:
-            client-id: ${GITHUB_CLIENT_ID:}
-            client-secret: ${GITHUB_CLIENT_SECRET:}
-            scope: read:user, user:email
         provider:
           kakao:
             authorization-uri: https://kauth.kakao.com/oauth/authorize
