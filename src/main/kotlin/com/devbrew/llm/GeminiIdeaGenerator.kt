@@ -50,6 +50,9 @@ class GeminiIdeaGenerator(
             Idea(
                 title = parsed["title"] as String,
                 description = parsed["description"] as String,
+                purpose = parsed["purpose"] as? String,
+                howItWorks = parsed["howItWorks"] as? String,
+                suggestedStack = parsed["suggestedStack"] as? String,
                 sourceTrack = signal.track,
                 sourceUrl = signal.url,
                 rawSignal = signal.body,
@@ -82,6 +85,17 @@ class GeminiIdeaGenerator(
     private fun buildPrompt(signal: RawSignal): String {
         val title = normalize(signal.title)
         val body = normalize(signal.body)
-        return "Signal: $title\n\n$body\n\nGenerate a startup idea. Respond with JSON only: {\"title\": \"...\", \"description\": \"...\"}"
+        return """Signal: $title
+
+$body
+
+Generate a startup idea. Respond with JSON only:
+{
+  "title": "concise product name",
+  "description": "1-2 sentence overview of the product",
+  "purpose": "사용 목적 — what specific problem this solves and who experiences it (2-3 sentences)",
+  "howItWorks": "어떻게 동작하나요 — step-by-step explanation of how the product works (2-4 steps, each on a new line starting with a number)",
+  "suggestedStack": "recommended tech stack and key libraries (concise list)"
+}"""
     }
 }

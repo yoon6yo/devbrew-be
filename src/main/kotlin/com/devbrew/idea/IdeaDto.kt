@@ -15,6 +15,9 @@ data class IdeaDto(
     @Schema(description = "누적 스타 수") val starCount: Int,
     @Schema(description = "아이디어 처리 상태 (PENDING → SCORED → NOTIFIED / REJECTED)") val status: IdeaStatus,
     @Schema(description = "생성 시각 (ISO 8601)") val createdAt: OffsetDateTime,
+    @Schema(description = "사용 목적 — 어떤 문제를 해결하는가") val purpose: String?,
+    @Schema(description = "어떻게 동작하나요 — 단계별 동작 방식") val howItWorks: String?,
+    @Schema(description = "추천 기술 스택") val suggestedStack: String?,
 )
 
 fun Idea.toDto() = IdeaDto(
@@ -28,4 +31,7 @@ fun Idea.toDto() = IdeaDto(
     starCount = starCount,
     status = status,
     createdAt = createdAt,
+    purpose = purpose,
+    howItWorks = howItWorks,
+    suggestedStack = suggestedStack,
 )

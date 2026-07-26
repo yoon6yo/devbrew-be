@@ -30,6 +30,15 @@ class Idea(
     @Column(name = "score_reason", columnDefinition = "TEXT")
     var scoreReason: String? = null,
 
+    @Column(columnDefinition = "TEXT")
+    var purpose: String? = null,
+
+    @Column(name = "how_it_works", columnDefinition = "TEXT")
+    var howItWorks: String? = null,
+
+    @Column(name = "suggested_stack", columnDefinition = "TEXT")
+    var suggestedStack: String? = null,
+
     @Column(name = "star_count", nullable = false)
     var starCount: Int = 0,
 
