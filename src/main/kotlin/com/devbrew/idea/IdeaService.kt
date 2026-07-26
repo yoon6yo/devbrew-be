@@ -31,10 +31,15 @@ class IdeaService(
     fun save(idea: Idea): Idea = ideaRepository.save(idea)
 
     @Transactional
-    fun updateScore(id: Long, score: Short, reason: String): Idea {
+    fun updateScore(id: Long, result: com.devbrew.llm.ScoreResult): Idea {
         val idea = getById(id)
-        idea.score = score
-        idea.scoreReason = reason
+        idea.score = result.score
+        idea.scoreMarketFit = result.marketFit
+        idea.scoreNovelty = result.novelty
+        idea.scoreFeasibility = result.feasibility
+        idea.scoreMonetization = result.monetization
+        idea.scoreTrend = result.trend
+        idea.scoreReason = result.reason
         idea.status = IdeaStatus.SCORED
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)

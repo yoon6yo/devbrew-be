@@ -52,8 +52,8 @@ class PipelineScheduler(
             .getOrDefault(emptyMap())
 
         val scored = newIdeas.mapNotNull { idea ->
-            val (score, reason) = ratings[idea.id] ?: return@mapNotNull null
-            runCatching { ideaService.updateScore(idea.id, score, reason) }
+            val result = ratings[idea.id] ?: return@mapNotNull null
+            runCatching { ideaService.updateScore(idea.id, result) }
                 .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
                 .getOrNull()
         }

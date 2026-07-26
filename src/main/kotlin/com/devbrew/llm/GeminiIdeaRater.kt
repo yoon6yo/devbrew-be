@@ -18,7 +18,7 @@ class GeminiIdeaRater(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun rateAll(ideas: List<Idea>): Map<Long, Pair<Short, String>> {
+    override fun rateAll(ideas: List<Idea>): Map<Long, ScoreResult> {
         if (ideas.isEmpty()) return emptyMap()
 
         log.info("Rating ${ideas.size} ideas via Gemini (concurrent)")
@@ -27,7 +27,7 @@ class GeminiIdeaRater(
             .flatMap { idea ->
                 rateOne(idea).onErrorResume { e ->
                     log.warn("Rating failed for idea ${idea.id}", e)
-                    Mono.empty()
+                    Mono.empty<Pair<Long, ScoreResult>>()
                 }
             }
             .collectList()
@@ -37,7 +37,7 @@ class GeminiIdeaRater(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun rateOne(idea: Idea): Mono<Pair<Long, Pair<Short, String>>> {
+    private fun rateOne(idea: Idea): Mono<Pair<Long, ScoreResult>> {
         val uri = "${props.gemini.baseUrl}/v1beta/models/${props.gemini.model}:generateContent"
         return webClient.post()
             .uri(uri)
@@ -53,18 +53,37 @@ class GeminiIdeaRater(
                 val parts = (candidates[0]["content"] as Map<*, *>)["parts"] as List<Map<*, *>>
                 val text = parts[0]["text"] as String
                 val parsed = objectMapper.readValue(text, Map::class.java)
-                val score = (parsed["score"] as Number).toInt().coerceIn(1, 10).toShort()
+
+                fun score(key: String) = (parsed[key] as Number).toInt().coerceIn(1, 10).toShort()
+                val marketFit    = score("market_fit")
+                val novelty      = score("novelty")
+                val feasibility  = score("feasibility")
+                val monetization = score("monetization")
+                val trend        = score("trend")
+
+                // Weighted: market_fit 30%, novelty 20%, feasibility 20%, monetization 20%, trend 10%
+                val weighted = (marketFit * 0.30 + novelty * 0.20 + feasibility * 0.20 +
+                        monetization * 0.20 + trend * 0.10).toInt().coerceIn(1, 10).toShort()
+
                 val reason = parsed["reason"] as String
-                idea.id!! to (score to reason)
+                idea.id!! to ScoreResult(weighted, marketFit, novelty, feasibility, monetization, trend, reason)
             }
     }
 
     private fun ratingPrompt(idea: Idea): String =
-        """Rate this startup idea on a scale of 1-10.
+        """You are a startup idea evaluator. Rate the following idea on five axes, each 1–10.
 
 Title: ${idea.title}
 Description: ${idea.description}
 Source: ${idea.sourceTrack}
 
-Respond with JSON only: {"score": <1-10>, "reason": "<explanation under 100 words>"}"""
+Axes:
+- market_fit: Is there a real, painful problem? Is there a clearly defined audience willing to pay?
+- novelty: How differentiated is this from existing solutions?
+- feasibility: Can a small team (1-3 devs) realistically build and ship an MVP within 3 months?
+- monetization: Is there a clear, near-term revenue path (SaaS, marketplace fee, API pricing, etc.)?
+- trend: Does this ride a current wave (AI, no-code, developer tooling, etc.)?
+
+Respond with JSON only:
+{"market_fit":<1-10>,"novelty":<1-10>,"feasibility":<1-10>,"monetization":<1-10>,"trend":<1-10>,"reason":"<under 120 words summarising strengths and key risk>"}"""
 }

@@ -27,6 +27,21 @@ class Idea(
 
     var score: Short? = null,
 
+    @Column(name = "score_market_fit")
+    var scoreMarketFit: Short? = null,
+
+    @Column(name = "score_novelty")
+    var scoreNovelty: Short? = null,
+
+    @Column(name = "score_feasibility")
+    var scoreFeasibility: Short? = null,
+
+    @Column(name = "score_monetization")
+    var scoreMonetization: Short? = null,
+
+    @Column(name = "score_trend")
+    var scoreTrend: Short? = null,
+
     @Column(name = "score_reason", columnDefinition = "TEXT")
     var scoreReason: String? = null,
 
