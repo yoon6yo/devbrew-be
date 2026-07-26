@@ -1,6 +1,10 @@
 spring:
   application:
     name: devbrew-be
+  task:
+    scheduling:
+      pool:
+        size: 2
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/devbrew}
     username: ${DB_USERNAME:devbrew}
@@ -34,6 +38,12 @@ logging:
     org.flywaydb: INFO
 
 devbrew:
+  jwt:
+    secret: ${JWT_SECRET:devbrew-secret-key-change-in-production-32ch}
+    expiration-ms: 86400000
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:}
   slack:
     webhook-url: ${SLACK_WEBHOOK_URL:}
   claude:
@@ -44,6 +54,7 @@ devbrew:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     base-url: https://generativelanguage.googleapis.com
+    model: ${GEMINI_MODEL:gemini-2.5-flash-lite}
   pipeline:
     reddit:
       subreddits: SaaS,entrepreneur,startups,webdev,programming

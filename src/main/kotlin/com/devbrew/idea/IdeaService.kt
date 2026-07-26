@@ -1,14 +1,24 @@
 package com.devbrew.idea
 
+import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.data.domain.Page
+import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
 
 @Service
 @Transactional(readOnly = true)
-class IdeaService(private val ideaRepository: IdeaRepository) {
+class IdeaService(
+    private val ideaRepository: IdeaRepository,
+    private val userStarRepository: UserStarRepository,
+) {
 
     fun getAll(): List<Idea> = ideaRepository.findAllOrderedByScore()
+
+    fun getPage(status: IdeaStatus?, pageable: Pageable): Page<Idea> =
+        if (status != null) ideaRepository.findByStatus(status, pageable)
+        else ideaRepository.findAll(pageable)
 
     fun getById(id: Long): Idea = ideaRepository.findById(id)
         .orElseThrow { NoSuchElementException("Idea not found: $id") }
@@ -46,6 +56,37 @@ class IdeaService(private val ideaRepository: IdeaRepository) {
         return ideaRepository.save(idea)
     }
 
-    fun isDuplicate(sourceUrl: String, track: SourceTrack): Boolean =
-        ideaRepository.existsBySourceUrlAndSourceTrack(sourceUrl, track)
+    @Transactional
+    fun starIdea(id: Long, fingerprint: String): Pair<Idea, Boolean> {
+        require(fingerprint.isNotBlank() && fingerprint.length <= 64) { "Invalid fingerprint" }
+        val idea = getById(id)
+        if (userStarRepository.existsByIdeaIdAndFingerprint(id, fingerprint)) {
+            return idea to false
+        }
+        return try {
+            userStarRepository.save(UserStar(ideaId = id, fingerprint = fingerprint))
+            idea.starCount++
+            ideaRepository.save(idea) to true
+        } catch (e: DataIntegrityViolationException) {
+            idea to false
+        }
+    }
+
+    @Transactional
+    fun unstarIdea(id: Long, fingerprint: String): Pair<Idea, Boolean> {
+        require(fingerprint.isNotBlank() && fingerprint.length <= 64) { "Invalid fingerprint" }
+        val idea = getById(id)
+        if (!userStarRepository.existsByIdeaIdAndFingerprint(id, fingerprint)) {
+            return idea to false
+        }
+        userStarRepository.deleteByIdeaIdAndFingerprint(id, fingerprint)
+        idea.starCount = maxOf(0, idea.starCount - 1)
+        return ideaRepository.save(idea) to true
+    }
+
+    fun isDuplicate(sourceUrl: String?, rawSignal: String?, track: SourceTrack): Boolean = when {
+        sourceUrl != null -> ideaRepository.existsBySourceUrlAndSourceTrack(sourceUrl, track)
+        rawSignal != null -> ideaRepository.existsByRawSignalAndSourceTrack(rawSignal, track)
+        else -> false
+    }
 }

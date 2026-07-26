@@ -2,6 +2,7 @@ package com.devbrew.pipeline
 
 import com.devbrew.idea.Idea
 import com.devbrew.idea.IdeaService
+import com.devbrew.idea.IdeaStatus
 import com.devbrew.llm.IdeaGenerator
 import com.devbrew.llm.IdeaRater
 import com.devbrew.pipeline.collector.IdeaCollector
@@ -30,7 +31,7 @@ class PipelineScheduler(
 
         val newIdeas = signals
             .filter { signal ->
-                signal.url == null || !ideaService.isDuplicate(signal.url, signal.track)
+                !ideaService.isDuplicate(signal.url, signal.body, signal.track)
             }
             .mapNotNull { signal ->
                 runCatching { ideaGenerator.generate(signal) }
@@ -57,7 +58,7 @@ class PipelineScheduler(
                 .getOrNull()
         }
 
-        val topIdeas = scored.filter { it.score != null && it.score!! >= 7 }
+        val topIdeas = scored.filter { it.score != null && it.score!! >= 7 && it.status == IdeaStatus.SCORED }
         if (topIdeas.isNotEmpty()) {
             notifyTopIdeas(topIdeas)
         }
@@ -67,10 +68,13 @@ class PipelineScheduler(
 
     private fun notifyTopIdeas(ideas: List<Idea>) {
         ideas.forEach { idea ->
-            runCatching {
-                slackNotifier.notifyIdea(idea)
-                ideaService.markNotified(idea.id)
-            }.onFailure { log.warn("Slack notification failed for idea: ${idea.id}", it) }
+            val sent = runCatching { slackNotifier.notifyIdea(idea) }
+                .onFailure { log.warn("Slack notification failed for idea: ${idea.id}", it) }
+                .isSuccess
+            if (sent) {
+                runCatching { ideaService.markNotified(idea.id) }
+                    .onFailure { log.warn("Failed to mark idea ${idea.id} as notified", it) }
+            }
         }
     }
 }

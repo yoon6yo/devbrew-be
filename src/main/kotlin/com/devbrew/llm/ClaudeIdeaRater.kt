@@ -34,7 +34,7 @@ class ClaudeIdeaRater(
                 "custom_id" to idea.id.toString(),
                 "params" to mapOf(
                     "model" to "claude-haiku-4-5-20251001",
-                    "max_tokens" to 256,
+                    "max_tokens" to 512,
                     "messages" to listOf(mapOf("role" to "user", "content" to ratingPrompt(idea))),
                 )
             )
@@ -82,10 +82,15 @@ class ClaudeIdeaRater(
             .bodyToMono(String::class.java)
             .block() ?: return emptyMap()
 
-        return body.lines()
+        val results = mutableMapOf<Long, Pair<Short, String>>()
+        body.lines()
             .filter { it.isNotBlank() }
             .mapNotNull { parseResultLine(it) }
-            .toMap()
+            .forEach { (id, rating) ->
+                if (results.containsKey(id)) log.warn("Duplicate custom_id=$id in batch results, keeping latest")
+                results[id] = rating
+            }
+        return results
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -101,7 +106,11 @@ class ClaudeIdeaRater(
             }
 
             val message = result["message"] as Map<*, *>
-            val text = ((message["content"] as List<Map<*, *>>)[0])["text"] as String
+            val text = ((message["content"] as List<Map<*, *>>)[0])["text"] as? String
+                ?: run {
+                    log.warn("No text content in batch result for custom_id=$customId")
+                    return null
+                }
             val scoreJson = objectMapper.readValue(text, Map::class.java)
 
             val score = (scoreJson["score"] as Number).toInt().coerceIn(1, 10).toShort()
@@ -126,6 +135,5 @@ Respond with JSON only: {"score": <1-10>, "reason": "<explanation under 100 word
     private fun org.springframework.http.HttpHeaders.claudeHeaders(apiKey: String) {
         set("x-api-key", apiKey)
         set("anthropic-version", "2023-06-01")
-        set("anthropic-beta", "message-batches-2024-09-24")
     }
 }
