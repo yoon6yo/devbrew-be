@@ -16,7 +16,7 @@
 | 서버 상태 | TanStack Query v5 |
 | 라우팅 | React Router v7 |
 | UI | Tailwind CSS + shadcn/ui |
-| HTTP | Axios |
+| HTTP | native fetch (thin wrapper) |
 | 디자인 시스템 | OMD (DESIGN.md → omd-harness → omd-apply) |
 
 ### 디렉터리 구조
@@ -24,12 +24,12 @@
 ```
 devbrew-fe/
 ├── src/
-│   ├── api/          — axios 인스턴스 + API 함수 (getIdeas, getIdea, rejectIdea)
+│   ├── api/          — fetch wrapper + API 함수 (getIdeas, getIdea, rejectIdea, exportTopIdeas)
 │   ├── components/   — StatusBadge, TrackBadge, ScoreBar, IdeaCard, IdeaModal, Pagination
 │   ├── pages/        — DashboardPage, IdeaDetailPage (또는 모달)
 │   ├── hooks/        — useIdeas, useIdeaDetail, useRejectIdea
 │   ├── types/        — IdeaDto, IdeaStatus, SourceTrack, PageResponse
-│   └── utils/        — dateFormat, scoreColor
+│   ├── utils/        — dateFormat, scoreColor, exportJson, exportCsv
 ├── k8s/
 │   ├── deployment.yaml
 │   ├── service.yaml
@@ -61,6 +61,11 @@ devbrew-fe/
 - 페이지네이션: 20개씩, 총 페이지 표시
 - 각 카드 클릭 → 상세 모달 오픈
 
+**상위 5개 Export 버튼**
+- 대시보드 우상단 고정 버튼 "Top 5 Export"
+- `GET /api/ideas?sort=score,desc&page=0&size=5` 호출 → JSON 또는 CSV 파일로 즉시 다운로드
+- 포맷 선택: JSON (기본) / CSV (토글 또는 드롭다운)
+
 **빈 상태 / 로딩 / 에러 처리**
 - 로딩: 스켈레톤 카드
 - 빈 결과: "아직 아이디어가 없습니다" 일러스트 + 메시지
@@ -85,8 +90,12 @@ devbrew-fe/
 ### API 레이어
 
 ```typescript
+// src/api/client.ts — fetch wrapper (공통 에러 처리)
+async function apiFetch<T>(path: string, init?: RequestInit): Promise<T>
+
 // src/api/ideas.ts
 GET  /api/ideas?status=&page=&size=20&sort=score,desc  → PageResponse<IdeaDto>
+GET  /api/ideas?sort=score,desc&page=0&size=5           → PageResponse<IdeaDto>  // export용
 GET  /api/ideas/:id                                     → IdeaDto
 POST /api/ideas/:id/reject                              → IdeaDto
 ```
@@ -185,5 +194,6 @@ FE 로그인 제거에 따라 BE에서 `/api/**` 인증 설정을 제거하거�
 - [ ] 카드 클릭 → 모달에서 전체 정보 확인
 - [ ] 거절 버튼 클릭 → 낙관적 업데이트, 목록 즉시 반영
 - [ ] 빈/로딩/에러 상태 모두 처리
+- [ ] "Top 5 Export" 버튼 → JSON/CSV 파일 다운로드
 - [ ] main push → CI → CD 자동 배포
 - [ ] omd-final-qa Impeccable audit 통과
