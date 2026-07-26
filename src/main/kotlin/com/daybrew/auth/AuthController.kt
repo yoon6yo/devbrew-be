@@ -41,20 +41,22 @@ class AuthController(
     @PostMapping("/login")
     @Operation(summary = "Login with email and password — returns a Bearer JWT")
     fun login(@RequestBody req: LoginRequest, httpRequest: HttpServletRequest): ResponseEntity<LoginResponse> {
-        val ip = httpRequest.getHeader("X-Forwarded-For")?.split(",")?.first()?.trim()
-            ?: httpRequest.remoteAddr
+        val ip = httpRequest.remoteAddr
 
-        if (rateLimiter.isBlocked(ip)) {
+        val emailKey = "email:${req.email}"
+        if (rateLimiter.isBlocked(ip) || rateLimiter.isBlocked(emailKey)) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build()
         }
 
         val user = userRepository.findByEmail(req.email)
         if (user == null || user.passwordHash == null || !passwordEncoder.matches(req.password, user.passwordHash)) {
             rateLimiter.recordFailure(ip)
+            rateLimiter.recordFailure(emailKey)
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
         }
 
         rateLimiter.recordSuccess(ip)
+        rateLimiter.recordSuccess(emailKey)
         return ResponseEntity.ok(LoginResponse(jwtTokenProvider.generate(user.id, user.email, user.role)))
     }
 }

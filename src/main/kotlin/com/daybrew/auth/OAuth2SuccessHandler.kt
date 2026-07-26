@@ -1,6 +1,7 @@
 package com.daybrew.auth
 
 import com.daybrew.config.DayBrewProperties
+import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.security.core.Authentication
@@ -44,7 +45,15 @@ class OAuth2SuccessHandler(
             ?: userRepository.save(User(email = email, provider = provider, providerId = providerId))
 
         val token = jwtTokenProvider.generate(user.id, user.email, user.role)
-        response.sendRedirect("${props.frontend.url}/oauth2/callback?token=$token")
+        // Deliver JWT via HttpOnly cookie to avoid URL/history/Referer leakage
+        val cookie = Cookie("access_token", token).apply {
+            isHttpOnly = true
+            secure = true
+            path = "/"
+            maxAge = (props.jwt.expirationMs / 1000).toInt()
+        }
+        response.addCookie(cookie)
+        response.sendRedirect("${props.frontend.url}/oauth2/callback")
     }
 
     private fun extractEmail(provider: Provider, attrs: Map<String, Any>): String? = when (provider) {

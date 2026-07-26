@@ -13,7 +13,11 @@ data class JwtClaims(val userId: Long, val email: String, val role: UserRole)
 class JwtTokenProvider(private val props: DayBrewProperties) {
 
     private val key: SecretKey by lazy {
-        Keys.hmacShaKeyFor(props.jwt.secret.toByteArray(Charsets.UTF_8))
+        val secret = props.jwt.secret
+        require(secret.length >= 32 && secret != "daybrew-secret-key-change-in-production-32ch") {
+            "JWT_SECRET must be a strong non-default value (>=32 chars). Set it via environment variable."
+        }
+        Keys.hmacShaKeyFor(secret.toByteArray(Charsets.UTF_8))
     }
 
     fun generate(userId: Long, email: String, role: UserRole): String = Jwts.builder()

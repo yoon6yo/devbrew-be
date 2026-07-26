@@ -5,7 +5,7 @@ metadata:
   namespace: daybrew
 type: Opaque
 stringData:
-  password: "lSekyRc4vFaKqk52gWof"
+  password: "REPLACE_BEFORE_APPLY"   # never commit a real password; create out-of-band
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
