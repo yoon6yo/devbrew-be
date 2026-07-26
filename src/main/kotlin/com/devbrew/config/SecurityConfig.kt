@@ -32,6 +32,7 @@ class SecurityConfig(private val jwtAuthFilter: JwtAuthFilter) {
                     .requestMatchers(HttpMethod.GET, "/api/ideas", "/api/ideas/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/ideas/*/star").permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/ideas/*/star").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/ideas/*/reject").permitAll()
                     .anyRequest().authenticated()
             }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
