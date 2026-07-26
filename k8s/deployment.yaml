@@ -10,7 +10,7 @@ metadata:
   namespace: daybrew
 spec:
   replicas: 1
-selector:
+  selector:
     matchLabels:
       app: daybrew
   template:
