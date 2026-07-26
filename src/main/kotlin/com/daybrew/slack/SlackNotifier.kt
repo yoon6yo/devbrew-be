@@ -14,10 +14,19 @@ class SlackNotifier(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
+    companion object {
+        private val WEBHOOK_PATTERN =
+            Regex("""^https://hooks\.slack\.com/services/[A-Z0-9]+/[A-Z0-9]+/[a-zA-Z0-9]+$""")
+    }
+
     fun notifyIdea(idea: Idea) {
         val url = props.slack.webhookUrl
         if (url.isBlank()) {
             log.info("Slack webhook not configured — skipping notification for idea ${idea.id}")
+            return
+        }
+        if (!WEBHOOK_PATTERN.matches(url)) {
+            log.warn("Slack webhook URL failed validation — refusing to POST for idea ${idea.id}")
             return
         }
 
