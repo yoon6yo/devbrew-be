@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: postgres-secret
-  namespace: devbrew
+  namespace: daybrew
 type: Opaque
 stringData:
   password: "lSekyRc4vFaKqk52gWof"
@@ -11,7 +11,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc
-  namespace: devbrew
+  namespace: daybrew
 spec:
   accessModes:
     - ReadWriteOnce
@@ -23,7 +23,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
-  namespace: devbrew
+  namespace: daybrew
 spec:
   replicas: 1
   selector:
@@ -41,9 +41,9 @@ spec:
             - containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: devbrew
+              value: daybrew
             - name: POSTGRES_USER
-              value: devbrew
+              value: daybrew
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -68,7 +68,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: devbrew
+  namespace: daybrew
 spec:
   selector:
     app: postgres

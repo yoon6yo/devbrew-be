@@ -1,14 +1,14 @@
 spring:
   application:
-    name: devbrew-be
+    name: daybrew-be
   task:
     scheduling:
       pool:
         size: 2
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/devbrew}
-    username: ${DB_USERNAME:devbrew}
-    password: ${DB_PASSWORD:devbrew}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/daybrew}
+    username: ${DB_USERNAME:daybrew}
+    password: ${DB_PASSWORD:daybrew}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -34,12 +34,12 @@ management:
 
 logging:
   level:
-    com.devbrew: DEBUG
+    com.daybrew: DEBUG
     org.flywaydb: INFO
 
-devbrew:
+daybrew:
   jwt:
-    secret: ${JWT_SECRET:devbrew-secret-key-change-in-production-32ch}
+    secret: ${JWT_SECRET:daybrew-secret-key-change-in-production-32ch}
     expiration-ms: 86400000
   admin:
     username: ${ADMIN_USERNAME:admin}
@@ -53,7 +53,7 @@ devbrew:
   pipeline:
     reddit:
       subreddits: SaaS,entrepreneur,startups,webdev,programming
-      user-agent: devbrew/1.0 (idea-curator)
+      user-agent: daybrew/1.0 (idea-curator)
     github:
       pat: ${GITHUB_PAT:}
       min-stars: 100

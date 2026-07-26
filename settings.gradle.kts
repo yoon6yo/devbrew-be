@@ -1,1 +1,1 @@
-rootProject.name = "devbrew-be"
+rootProject.name = "daybrew-be"
