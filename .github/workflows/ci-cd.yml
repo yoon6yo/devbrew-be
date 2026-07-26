@@ -65,8 +65,7 @@ jobs:
           key: ${{ secrets.K8S_SSH_KEY }}
           envs: DEPLOY_SHA
           script: |
-            SHA=$(echo ${DEPLOY_SHA} | cut -c1-7)
             curl -s https://raw.githubusercontent.com/yoon6yo/devbrew-be/main/k8s/deployment.yaml \
-              | sed "s|image: ghcr.io/yoon6yo/devbrew-be:.*|image: ghcr.io/yoon6yo/devbrew-be:sha-${SHA}|" \
+              | sed "s|image: ghcr.io/yoon6yo/devbrew-be:.*|image: ghcr.io/yoon6yo/devbrew-be:sha-${DEPLOY_SHA}|" \
               | kubectl apply -f -
             kubectl rollout status deployment/daybrew -n daybrew --timeout=300s
