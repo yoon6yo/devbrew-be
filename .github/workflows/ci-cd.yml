@@ -54,6 +54,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     environment: production
+    env:
+      DEPLOY_SHA: ${{ github.sha }}
     steps:
       - uses: appleboy/ssh-action@v1
         with:
@@ -61,7 +63,10 @@ jobs:
           port: ${{ secrets.K8S_SSH_PORT }}
           username: ${{ secrets.K8S_SSH_USER }}
           key: ${{ secrets.K8S_SSH_KEY }}
+          envs: DEPLOY_SHA
           script: |
-            kubectl apply -f https://raw.githubusercontent.com/yoon6yo/devbrew-be/main/k8s/deployment.yaml
-            kubectl rollout restart deployment/daybrew -n daybrew
+            SHA=$(echo ${DEPLOY_SHA} | cut -c1-7)
+            curl -s https://raw.githubusercontent.com/yoon6yo/devbrew-be/main/k8s/deployment.yaml \
+              | sed "s|image: ghcr.io/yoon6yo/devbrew-be:.*|image: ghcr.io/yoon6yo/devbrew-be:sha-${SHA}|" \
+              | kubectl apply -f -
             kubectl rollout status deployment/daybrew -n daybrew --timeout=300s
