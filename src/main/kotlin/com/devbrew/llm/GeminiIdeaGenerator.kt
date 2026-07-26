@@ -20,11 +20,12 @@ class GeminiIdeaGenerator(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun generate(signal: RawSignal): Idea {
-        val uri = "${props.gemini.baseUrl}/v1beta/models/gemini-2.0-flash:generateContent?key=${props.gemini.apiKey}"
+        val uri = "${props.gemini.baseUrl}/v1beta/models/${props.gemini.model}:generateContent"
 
         @Suppress("UNCHECKED_CAST")
         val response = webClient.post()
             .uri(uri)
+            .header("x-goog-api-key", props.gemini.apiKey)
             .bodyValue(
                 mapOf(
                     "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
@@ -71,6 +72,16 @@ class GeminiIdeaGenerator(
         SourceTrack.VIRAL -> "You are a viral product designer. Identify what makes this concept appealing and suggest a concrete consumer product idea."
     }
 
-    private fun buildPrompt(signal: RawSignal): String =
-        "Signal: ${signal.title}\n\n${signal.body}\n\nGenerate a startup idea. Respond with JSON only: {\"title\": \"...\", \"description\": \"...\"}"
+    private fun normalize(text: String): String = text
+        .replace(Regex("<[^>]++>"), "")
+        .replace(Regex("https?://\\S+"), "")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+        .take(2000)
+
+    private fun buildPrompt(signal: RawSignal): String {
+        val title = normalize(signal.title)
+        val body = normalize(signal.body)
+        return "Signal: $title\n\n$body\n\nGenerate a startup idea. Respond with JSON only: {\"title\": \"...\", \"description\": \"...\"}"
+    }
 }

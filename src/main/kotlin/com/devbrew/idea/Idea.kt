@@ -30,6 +30,9 @@ class Idea(
     @Column(name = "score_reason", columnDefinition = "TEXT")
     var scoreReason: String? = null,
 
+    @Column(name = "star_count", nullable = false)
+    var starCount: Int = 0,
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
     var status: IdeaStatus = IdeaStatus.PENDING,
