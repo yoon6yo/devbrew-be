@@ -3,6 +3,7 @@ package com.daybrew.pipeline
 import com.daybrew.idea.Idea
 import com.daybrew.idea.IdeaService
 import com.daybrew.idea.IdeaStatus
+import com.daybrew.idea.SourceTrack
 import com.daybrew.llm.IdeaGenerator
 import com.daybrew.llm.IdeaRater
 import com.daybrew.pipeline.collector.IdeaCollector
@@ -26,9 +27,12 @@ class PipelineScheduler(
     // Run daily at 09:00 KST (00:00 UTC)
     @Async
     @Scheduled(cron = "0 0 0 * * *")
-    fun runPipeline() {
-        log.info("Pipeline started")
+    fun runPipeline() = runPipeline(sources = null, minScore = 7)
+
+    fun runPipeline(sources: Set<SourceTrack>?, minScore: Int) {
+        log.info("Pipeline started — sources={}, minScore={}", sources ?: "ALL", minScore)
         val signals = collectors.flatMap { it.collect() }
+            .let { all -> if (sources != null) all.filter { it.track in sources } else all }
         log.info("Collected ${signals.size} raw signals")
 
         val newIdeas = signals
@@ -60,7 +64,7 @@ class PipelineScheduler(
                 .getOrNull()
         }
 
-        val topIdeas = scored.filter { it.score != null && it.score!! >= 7 && it.status == IdeaStatus.SCORED }
+        val topIdeas = scored.filter { it.score != null && it.score!! >= minScore && it.status == IdeaStatus.SCORED }
         if (topIdeas.isNotEmpty()) {
             notifyTopIdeas(topIdeas)
         }
