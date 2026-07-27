@@ -128,8 +128,8 @@ class PipelineIntegrationTest {
         val toNotify = ideaService.save(makeIdea("Notified"))
         ideaService.markNotified(toNotify.id)
 
-        val pendingPage = ideaService.getPage(IdeaStatus.PENDING, PageRequest.of(0, 10))
-        val notifiedPage = ideaService.getPage(IdeaStatus.NOTIFIED, PageRequest.of(0, 10))
+        val pendingPage = ideaService.getPage(IdeaStatus.PENDING, null, null, PageRequest.of(0, 10))
+        val notifiedPage = ideaService.getPage(IdeaStatus.NOTIFIED, null, null, PageRequest.of(0, 10))
 
         assertThat(pendingPage.totalElements).isEqualTo(1)
         assertThat(pendingPage.content[0].title).isEqualTo("Pending")
@@ -142,7 +142,7 @@ class PipelineIntegrationTest {
         ideaService.save(makeIdea("A"))
         ideaService.save(makeIdea("B"))
 
-        val page = ideaService.getPage(null, PageRequest.of(0, 10))
+        val page = ideaService.getPage(null, null, null, PageRequest.of(0, 10))
         assertThat(page.totalElements).isEqualTo(2)
     }
 

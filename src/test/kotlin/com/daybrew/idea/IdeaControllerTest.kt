@@ -18,12 +18,14 @@ class IdeaControllerTest {
     private val ideaService = mockk<IdeaService>()
     private val adminStatsService = mockk<AdminStatsService>(relaxed = true)
     private val starRateLimiter = mockk<StarRateLimiter>()
+    private val slackNotifier = mockk<com.daybrew.slack.SlackNotifier>(relaxed = true)
+    private val geminiIdeaRater = mockk<com.daybrew.llm.GeminiIdeaRater>(relaxed = true)
     private val mockRequest = mockk<HttpServletRequest>()
     private lateinit var controller: IdeaController
 
     @BeforeEach
     fun setUp() {
-        controller = IdeaController(ideaService, adminStatsService, starRateLimiter)
+        controller = IdeaController(ideaService, adminStatsService, starRateLimiter, slackNotifier, geminiIdeaRater)
         every { mockRequest.getHeader("X-Real-IP") } returns null
         every { mockRequest.remoteAddr } returns "127.0.0.1"
         every { starRateLimiter.checkAndRecord(any()) } returns null
@@ -56,9 +58,9 @@ class IdeaControllerTest {
     fun `list returns page of IdeaDtos`() {
         val pageable = PageRequest.of(0, 20, Sort.by(Sort.Direction.DESC, "score"))
         val page = PageImpl(listOf(idea(1L), idea(2L)), pageable, 2)
-        every { ideaService.getPage(null, pageable) } returns page
+        every { ideaService.getPage(null, null, null, pageable) } returns page
 
-        val result = controller.list(null, pageable)
+        val result = controller.list(null, null, null, pageable)
 
         assertThat(result.totalElements).isEqualTo(2)
         assertThat(result.content[0].id).isEqualTo(1L)
@@ -73,9 +75,9 @@ class IdeaControllerTest {
             sourceTrack = SourceTrack.SAAS, rawSignal = "SECRET_RAW_SIGNAL",
         )
         val page = PageImpl(listOf(ideaWithRawSignal), pageable, 1)
-        every { ideaService.getPage(null, pageable) } returns page
+        every { ideaService.getPage(null, null, null, pageable) } returns page
 
-        val result = controller.list(null, pageable)
+        val result = controller.list(null, null, null, pageable)
 
         val dto = result.content[0]
         // IdeaDto does not have a rawSignal field — verified by compile-time type
@@ -87,9 +89,9 @@ class IdeaControllerTest {
     fun `list with status filter passes status to service`() {
         val pageable = PageRequest.of(0, 20)
         val page = PageImpl(listOf(idea(1L, status = IdeaStatus.NOTIFIED)), pageable, 1)
-        every { ideaService.getPage(IdeaStatus.NOTIFIED, pageable) } returns page
+        every { ideaService.getPage(IdeaStatus.NOTIFIED, null, null, pageable) } returns page
 
-        val result = controller.list(IdeaStatus.NOTIFIED, pageable)
+        val result = controller.list(IdeaStatus.NOTIFIED, null, null, pageable)
 
         assertThat(result.content[0].status).isEqualTo(IdeaStatus.NOTIFIED)
     }
@@ -97,9 +99,9 @@ class IdeaControllerTest {
     @Test
     fun `list returns empty page when no ideas`() {
         val pageable = PageRequest.of(0, 20)
-        every { ideaService.getPage(null, pageable) } returns PageImpl(emptyList(), pageable, 0)
+        every { ideaService.getPage(null, null, null, pageable) } returns PageImpl(emptyList(), pageable, 0)
 
-        val result = controller.list(null, pageable)
+        val result = controller.list(null, null, null, pageable)
 
         assertThat(result.isEmpty).isTrue()
     }

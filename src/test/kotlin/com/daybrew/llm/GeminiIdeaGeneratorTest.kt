@@ -33,7 +33,10 @@ class GeminiIdeaGeneratorTest {
                 baseUrl = "http://localhost:${wireMock.port()}",
             )
         )
-        generator = GeminiIdeaGenerator(WebClient.builder().build(), props, ObjectMapper(), mockk(relaxed = true))
+        generator = GeminiIdeaGenerator(
+            WebClient.builder().build(), props, ObjectMapper(),
+            mockk(relaxed = true), mockk(relaxed = true),
+        )
     }
 
     @AfterEach
@@ -42,69 +45,69 @@ class GeminiIdeaGeneratorTest {
     @Test
     fun `generates idea from SAAS signal with valid JSON response`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("""{"title":"Notion Alternative","description":"Affordable project management SaaS"}""")))
         )
 
-        val idea = generator.generate(RawSignal(
+        val result = generator.generate(RawSignal(
             title = "Notion is too expensive",
             body = "Users want a cheaper alternative",
             url = "https://reddit.com/r/SaaS/1",
             track = SourceTrack.SAAS,
         ))
 
-        assertThat(idea.title).isEqualTo("Notion Alternative")
-        assertThat(idea.description).isEqualTo("Affordable project management SaaS")
-        assertThat(idea.sourceTrack).isEqualTo(SourceTrack.SAAS)
-        assertThat(idea.sourceUrl).isEqualTo("https://reddit.com/r/SaaS/1")
+        assertThat(result.idea.title).isEqualTo("Notion Alternative")
+        assertThat(result.idea.description).isEqualTo("Affordable project management SaaS")
+        assertThat(result.idea.sourceTrack).isEqualTo(SourceTrack.SAAS)
+        assertThat(result.idea.sourceUrl).isEqualTo("https://reddit.com/r/SaaS/1")
     }
 
     @Test
     fun `generates idea from GITHUB signal`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("""{"title":"AI Code Review Tool","description":"Automated PR review via LLM"}""")))
         )
 
-        val idea = generator.generate(RawSignal(
+        val result = generator.generate(RawSignal(
             title = "trending-llm-reviewer",
             body = "1500 stars, automated code reviews",
             url = "https://github.com/user/repo",
             track = SourceTrack.GITHUB,
         ))
 
-        assertThat(idea.title).isEqualTo("AI Code Review Tool")
-        assertThat(idea.sourceTrack).isEqualTo(SourceTrack.GITHUB)
+        assertThat(result.idea.title).isEqualTo("AI Code Review Tool")
+        assertThat(result.idea.sourceTrack).isEqualTo(SourceTrack.GITHUB)
     }
 
     @Test
     fun `falls back to signal data when Gemini returns invalid JSON`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("This is not JSON")))
         )
 
-        val idea = generator.generate(RawSignal(
+        val result = generator.generate(RawSignal(
             title = "Fallback Title",
             body = "Fallback body",
             url = null,
             track = SourceTrack.VIRAL,
         ))
 
-        assertThat(idea.title).isEqualTo("Fallback Title")
-        assertThat(idea.description).isEqualTo("Fallback body")
+        assertThat(result.idea.title).isEqualTo("Fallback Title")
+        assertThat(result.idea.description).isEqualTo("Fallback body")
     }
 
     @Test
     fun `normalize strips HTML tags before sending to Gemini`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("""{"title":"Clean","description":"Stripped"}""")))
@@ -118,7 +121,7 @@ class GeminiIdeaGeneratorTest {
         ))
 
         wireMock.verify(
-            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1beta/models/.*:generateContent"))
+            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1/models/.*:generateContent"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("<h1>"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("<p>"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("<b>"))
@@ -130,7 +133,7 @@ class GeminiIdeaGeneratorTest {
     @Test
     fun `normalize strips URLs before sending to Gemini`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("""{"title":"No URL","description":"Clean"}""")))
@@ -144,7 +147,7 @@ class GeminiIdeaGeneratorTest {
         ))
 
         wireMock.verify(
-            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1beta/models/.*:generateContent"))
+            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1/models/.*:generateContent"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("https://reddit.com"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("https://example.com"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing("Check this out"))
@@ -155,7 +158,7 @@ class GeminiIdeaGeneratorTest {
     @Test
     fun `normalize truncates body at 2000 characters`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody(geminiResponse("""{"title":"Long","description":"Truncated"}""")))
@@ -165,7 +168,7 @@ class GeminiIdeaGeneratorTest {
         generator.generate(RawSignal(title = "Test", body = longBody, url = null, track = SourceTrack.SAAS))
 
         wireMock.verify(
-            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1beta/models/.*:generateContent"))
+            com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1/models/.*:generateContent"))
                 .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("a".repeat(2001)))
         )
     }
@@ -173,7 +176,7 @@ class GeminiIdeaGeneratorTest {
     @Test
     fun `generate throws when Gemini returns HTTP 500`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse().withStatus(500).withBody("Internal Server Error"))
         )
 
@@ -185,22 +188,22 @@ class GeminiIdeaGeneratorTest {
     @Test
     fun `generate falls back to signal when Gemini response has no candidates`() {
         wireMock.stubFor(
-            post(urlPathMatching("/v1beta/models/.*:generateContent"))
+            post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
                     .withHeader("Content-Type", "application/json")
                     .withBody("""{"candidates":[]}"""))
         )
 
-        val idea = generator.generate(RawSignal(
+        val result = generator.generate(RawSignal(
             title = "Fallback Signal",
             body = "Fallback body",
             url = "https://example.com",
             track = SourceTrack.VIRAL,
         ))
 
-        assertThat(idea.title).isEqualTo("Fallback Signal")
-        assertThat(idea.description).isEqualTo("Fallback body")
-        assertThat(idea.sourceUrl).isEqualTo("https://example.com")
+        assertThat(result.idea.title).isEqualTo("Fallback Signal")
+        assertThat(result.idea.description).isEqualTo("Fallback body")
+        assertThat(result.idea.sourceUrl).isEqualTo("https://example.com")
     }
 
     private fun geminiResponse(text: String): String = """

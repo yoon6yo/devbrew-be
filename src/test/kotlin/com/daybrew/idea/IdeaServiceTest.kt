@@ -191,7 +191,7 @@ class IdeaServiceTest {
         val page = PageImpl(listOf(idea(1L)), pageable, 1)
         every { ideaRepository.findAll(pageable) } returns page
 
-        val result = service.getPage(null, pageable)
+        val result = service.getPage(null, null, null, pageable)
 
         assertThat(result.totalElements).isEqualTo(1)
         verify { ideaRepository.findAll(pageable) }
@@ -204,7 +204,7 @@ class IdeaServiceTest {
         val page = PageImpl(listOf(idea(1L, IdeaStatus.NOTIFIED)), pageable, 1)
         every { ideaRepository.findByStatus(IdeaStatus.NOTIFIED, pageable) } returns page
 
-        val result = service.getPage(IdeaStatus.NOTIFIED, pageable)
+        val result = service.getPage(IdeaStatus.NOTIFIED, null, null, pageable)
 
         assertThat(result.content[0].status).isEqualTo(IdeaStatus.NOTIFIED)
         verify { ideaRepository.findByStatus(IdeaStatus.NOTIFIED, pageable) }
@@ -216,7 +216,7 @@ class IdeaServiceTest {
         val pageable = PageRequest.of(0, 20)
         every { ideaRepository.findAll(pageable) } returns PageImpl(emptyList(), pageable, 0)
 
-        val result = service.getPage(null, pageable)
+        val result = service.getPage(null, null, null, pageable)
 
         assertThat(result.isEmpty).isTrue()
         assertThat(result.totalElements).isEqualTo(0)

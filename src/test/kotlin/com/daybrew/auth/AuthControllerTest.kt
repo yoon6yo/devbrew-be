@@ -34,6 +34,7 @@ class AuthControllerTest {
     @BeforeEach
     fun setUp() {
         controller = AuthController(userRepository, jwtTokenProvider, passwordEncoder, rateLimiter)
+        every { userRepository.findByEmail(any()) } returns null
     }
 
     // ── /register ─────────────────────────────────────────────────────────────
