@@ -47,9 +47,16 @@ class OAuth2SuccessHandler(
                 }
             val providerId = extractProviderId(provider, oAuth2User.attributes)
 
-            val user = userRepository.findByEmail(email)
+            val user = (userRepository.findByEmail(email)
                 ?: userRepository.findByProviderAndProviderId(provider, providerId)
-                ?: userRepository.save(User(email = email, provider = provider, providerId = providerId))
+                ?: userRepository.save(User(email = email, provider = provider, providerId = providerId)))
+                .also { u ->
+                    if (u.provider != provider || u.providerId != providerId) {
+                        u.provider = provider
+                        u.providerId = providerId
+                        userRepository.save(u)
+                    }
+                }
 
             if (email == props.admin.email && user.role != UserRole.ADMIN) {
                 user.role = UserRole.ADMIN

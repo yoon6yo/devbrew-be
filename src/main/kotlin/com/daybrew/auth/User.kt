@@ -21,10 +21,10 @@ class User(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val provider: Provider = Provider.LOCAL,
+    var provider: Provider = Provider.LOCAL,
 
     @Column(name = "provider_id")
-    val providerId: String? = null,
+    var providerId: String? = null,
 
     @Column(name = "created_at", nullable = false)
     val createdAt: OffsetDateTime = OffsetDateTime.now(),
