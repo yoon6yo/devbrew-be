@@ -113,6 +113,24 @@ class AuthControllerTest {
     }
 
     @Test
+    fun `login returns 429 with Retry-After header when IP is rate-limited`() {
+        val hash = passwordEncoder.encode("correctPwd")
+        val user = User(id = 1L, email = "user@example.com", passwordHash = hash, role = UserRole.USER)
+        every { userRepository.findByEmail("user@example.com") } returns user
+
+        val request = MockHttpServletRequest()
+        repeat(LoginRateLimiter.MAX_FAILURES) {
+            controller.login(LoginRequest("user@example.com", "wrongPwd"), request)
+        }
+
+        val response = controller.login(LoginRequest("user@example.com", "correctPwd"), request)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.TOO_MANY_REQUESTS)
+        assertThat(response.headers[HttpHeaders.RETRY_AFTER]).isNotNull
+        assertThat(response.headers.getFirst(HttpHeaders.RETRY_AFTER)!!.toLong()).isPositive()
+    }
+
+    @Test
     fun `login returns 401 for unknown email`() {
         every { userRepository.findByEmail("nobody@example.com") } returns null
 

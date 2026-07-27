@@ -27,6 +27,12 @@ class LoginRateLimiter {
         return entry.lockedUntil.get() > System.currentTimeMillis()
     }
 
+    fun retryAfterSeconds(key: String): Long {
+        val entry = store[key] ?: return 1L
+        val remaining = entry.lockedUntil.get() - System.currentTimeMillis()
+        return ((remaining + 999) / 1000).coerceAtLeast(1)
+    }
+
     fun recordFailure(key: String) {
         val entry = store.computeIfAbsent(key) { Entry() }
         entry.lastFailedAt.set(System.currentTimeMillis())

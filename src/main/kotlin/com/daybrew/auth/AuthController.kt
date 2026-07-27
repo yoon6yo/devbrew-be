@@ -51,7 +51,10 @@ class AuthController(
 
         val emailKey = "email:${req.email}"
         if (rateLimiter.isBlocked(ip) || rateLimiter.isBlocked(emailKey)) {
-            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS).build()
+            val retryAfter = maxOf(rateLimiter.retryAfterSeconds(ip), rateLimiter.retryAfterSeconds(emailKey))
+            return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header(HttpHeaders.RETRY_AFTER, retryAfter.toString())
+                .build()
         }
 
         val user = userRepository.findByEmail(req.email)
