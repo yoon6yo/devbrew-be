@@ -1,8 +1,8 @@
 package com.daybrew.llm
 
+import com.daybrew.admin.AdminStatsService
 import com.daybrew.config.DayBrewProperties
 import com.daybrew.idea.Idea
-import com.daybrew.idea.IdeaStatus
 import com.daybrew.idea.SourceTrack
 import com.daybrew.pipeline.collector.RawSignal
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -15,7 +15,7 @@ class GeminiIdeaGenerator(
     private val webClient: WebClient,
     private val props: DayBrewProperties,
     private val objectMapper: ObjectMapper,
-    private val adminStatsService: com.daybrew.admin.AdminStatsService,
+    private val adminStatsService: AdminStatsService,
 ) : IdeaGenerator {
 
     private val log = LoggerFactory.getLogger(javaClass)

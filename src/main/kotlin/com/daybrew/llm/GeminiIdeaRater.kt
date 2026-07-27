@@ -1,5 +1,6 @@
 package com.daybrew.llm
 
+import com.daybrew.admin.AdminStatsService
 import com.daybrew.config.DayBrewProperties
 import com.daybrew.idea.Idea
 import com.fasterxml.jackson.databind.ObjectMapper
@@ -14,7 +15,7 @@ class GeminiIdeaRater(
     private val webClient: WebClient,
     private val props: DayBrewProperties,
     private val objectMapper: ObjectMapper,
-    private val adminStatsService: com.daybrew.admin.AdminStatsService,
+    private val adminStatsService: AdminStatsService,
 ) : IdeaRater {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -75,7 +76,7 @@ class GeminiIdeaRater(
                     runCatching { adminStatsService.recordGeminiUsage("rate", prompt, completion) }
                 }
 
-                idea.id!! to ScoreResult(weighted, marketFit, novelty, feasibility, monetization, trend, reason)
+                idea.id to ScoreResult(weighted, marketFit, novelty, feasibility, monetization, trend, reason)
             }
     }
 
