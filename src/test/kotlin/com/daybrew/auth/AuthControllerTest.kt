@@ -6,10 +6,16 @@ import io.mockk.mockk
 import io.mockk.slot
 import io.mockk.verify
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.mock.web.MockHttpServletRequest
+import org.springframework.mock.web.MockHttpServletResponse
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
+import org.springframework.security.core.context.SecurityContextHolder
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 
 class AuthControllerTest {
@@ -125,5 +131,62 @@ class AuthControllerTest {
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
         assertThat(jwtTokenProvider.getClaims(response.body!!.token).role).isEqualTo(UserRole.ADMIN)
+    }
+
+    // ── /logout ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `logout returns 204 and sets expired access_token cookie`() {
+        val mockResponse = MockHttpServletResponse()
+
+        val response = controller.logout(mockResponse)
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.NO_CONTENT)
+        val setCookieHeader = mockResponse.getHeader(HttpHeaders.SET_COOKIE)
+        assertThat(setCookieHeader).contains("access_token=")
+        assertThat(setCookieHeader).contains("Max-Age=0")
+        assertThat(setCookieHeader).contains("HttpOnly")
+        assertThat(setCookieHeader).contains("SameSite=Lax")
+    }
+
+    // ── /me ────────────────────────────────────────────────────────────────────
+
+    @AfterEach
+    fun tearDown() {
+        SecurityContextHolder.clearContext()
+    }
+
+    @Test
+    fun `me returns 200 with email and role when authenticated`() {
+        SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(
+            "user@example.com", null, listOf(SimpleGrantedAuthority("ROLE_USER"))
+        )
+
+        val response = controller.me()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(response.body?.email).isEqualTo("user@example.com")
+        assertThat(response.body?.role).isEqualTo("USER")
+    }
+
+    @Test
+    fun `me returns ADMIN role when user is admin`() {
+        SecurityContextHolder.getContext().authentication = UsernamePasswordAuthenticationToken(
+            "admin@daybrew.local", null, listOf(SimpleGrantedAuthority("ROLE_ADMIN"))
+        )
+
+        val response = controller.me()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.OK)
+        assertThat(response.body?.role).isEqualTo("ADMIN")
+    }
+
+    @Test
+    fun `me returns 401 when not authenticated`() {
+        SecurityContextHolder.clearContext()
+
+        val response = controller.me()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNAUTHORIZED)
     }
 }
