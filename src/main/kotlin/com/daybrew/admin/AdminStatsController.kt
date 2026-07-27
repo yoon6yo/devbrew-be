@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RestController
 
 data class PipelineTriggerRequest(
     val sources: List<SourceTrack>? = null,
-    val minScore: Int = 7,
 )
 
 @RestController
@@ -41,8 +40,7 @@ class AdminStatsController(
     ): ResponseEntity<Map<String, String>> {
         val options = req ?: PipelineTriggerRequest()
         val sourcesSet = options.sources?.toSet()
-        val minScore = options.minScore.coerceIn(1, 10)
-        pipelineScheduler.runPipeline(sources = sourcesSet, minScore = minScore)
+        pipelineScheduler.runPipeline(sources = sourcesSet)
         return ResponseEntity.accepted().body(mapOf("message" to "Pipeline started"))
     }
 }

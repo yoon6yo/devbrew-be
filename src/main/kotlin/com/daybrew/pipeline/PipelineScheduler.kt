@@ -1,8 +1,6 @@
 package com.daybrew.pipeline
 
-import com.daybrew.idea.Idea
 import com.daybrew.idea.IdeaService
-import com.daybrew.idea.IdeaStatus
 import com.daybrew.idea.SourceTrack
 import com.daybrew.llm.IdeaGenerator
 import com.daybrew.llm.IdeaRater
@@ -27,18 +25,41 @@ class PipelineScheduler(
     // Run daily at 09:00 KST (00:00 UTC)
     @Async
     @Scheduled(cron = "0 0 0 * * *")
-    fun runPipeline() = runPipeline(sources = null, minScore = 7)
+    fun runPipeline() = runPipeline(sources = null)
 
-    fun runPipeline(sources: Set<SourceTrack>?, minScore: Int) {
-        log.info("Pipeline started — sources={}, minScore={}", sources ?: "ALL", minScore)
+    // Publish top scored ideas daily at midnight KST (15:00 UTC)
+    @Async
+    @Scheduled(cron = "0 0 15 * * *")
+    fun publishTopIdeas() {
+        val top = ideaService.getScored()
+            .filter { it.score != null }
+            .sortedByDescending { it.score }
+            .take(3)
+
+        if (top.isEmpty()) {
+            log.info("Publish job: no scored ideas to publish")
+            return
+        }
+
+        top.forEachIndexed { i, idea ->
+            if (i > 0) Thread.sleep(1_000)
+            runCatching { ideaService.markNotified(idea.id) }
+                .onFailure { log.warn("Failed to publish idea ${idea.id}", it) }
+            runCatching { slackNotifier.notifyIdea(idea) }
+                .onFailure { log.warn("Slack ping failed for idea ${idea.id}", it) }
+        }
+
+        log.info("Publish job complete — published ${top.size} ideas")
+    }
+
+    fun runPipeline(sources: Set<SourceTrack>?) {
+        log.info("Pipeline started — sources={}", sources ?: "ALL")
         val signals = collectors.flatMap { it.collect() }
             .let { all -> if (sources != null) all.filter { it.track in sources } else all }
         log.info("Collected ${signals.size} raw signals")
 
         val newIdeas = signals
-            .filter { signal ->
-                !ideaService.isDuplicate(signal.url, signal.body, signal.track)
-            }
+            .filter { signal -> !ideaService.isDuplicate(signal.url, signal.body, signal.track) }
             .mapNotNull { signal ->
                 runCatching { ideaGenerator.generate(signal) }
                     .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
@@ -64,23 +85,6 @@ class PipelineScheduler(
                 .getOrNull()
         }
 
-        val topIdeas = scored.filter { it.score != null && it.score!! >= minScore && it.status == IdeaStatus.SCORED }
-        if (topIdeas.isNotEmpty()) {
-            notifyTopIdeas(topIdeas)
-        }
-
-        log.info("Pipeline complete — scored=${scored.size}, notified=${topIdeas.size}")
-    }
-
-    private fun notifyTopIdeas(ideas: List<Idea>) {
-        ideas.parallelStream().forEach { idea ->
-            val sent = runCatching { slackNotifier.notifyIdea(idea) }
-                .onFailure { log.warn("Slack notification failed for idea: ${idea.id}", it) }
-                .isSuccess
-            if (sent) {
-                runCatching { ideaService.markNotified(idea.id) }
-                    .onFailure { log.warn("Failed to mark idea ${idea.id} as notified", it) }
-            }
-        }
+        log.info("Pipeline complete — scored=${scored.size}")
     }
 }
