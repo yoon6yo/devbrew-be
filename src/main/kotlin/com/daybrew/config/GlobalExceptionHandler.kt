@@ -7,6 +7,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.servlet.NoHandlerFoundException
 import java.util.UUID
 
 @RestControllerAdvice
@@ -37,6 +38,12 @@ class GlobalExceptionHandler {
         val fields = ex.bindingResult.fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
         log.warn("Validation failed: $fields")
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, fields)
+    }
+
+    @ExceptionHandler(NoHandlerFoundException::class)
+    fun handleNoHandler(ex: NoHandlerFoundException): ProblemDetail {
+        log.warn("No handler found: ${ex.requestURL}")
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Not found")
     }
 
     @ExceptionHandler(Exception::class)
