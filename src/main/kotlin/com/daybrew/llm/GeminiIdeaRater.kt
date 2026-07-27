@@ -40,7 +40,7 @@ class GeminiIdeaRater(
 
     @Suppress("UNCHECKED_CAST")
     private fun rateOne(idea: Idea): Mono<Pair<Long, ScoreResult>> {
-        val uri = "${props.gemini.baseUrl}/v1beta/models/${props.gemini.model}:generateContent"
+        val uri = "${props.gemini.baseUrl}/v1/models/${props.gemini.model}:generateContent"
         return webClient.post()
             .uri(uri)
             .header("x-goog-api-key", props.gemini.apiKey)

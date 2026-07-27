@@ -77,7 +77,15 @@ class AuthController(
         }
         val email = auth.name
         val role = auth.authorities.firstOrNull()?.authority?.removePrefix("ROLE_") ?: "USER"
-        return ResponseEntity.ok(MeResponse(email = email, role = role))
+        val user = userRepository.findByEmail(email)
+        return ResponseEntity.ok(
+            MeResponse(
+                email = email,
+                role = role,
+                provider = user?.provider?.name ?: "LOCAL",
+                joinedAt = user?.createdAt?.toString(),
+            )
+        )
     }
 
     @PostMapping("/logout")
@@ -105,4 +113,4 @@ data class LoginRequest(
     @field:NotBlank val password: String = "",
 )
 data class LoginResponse(val token: String)
-data class MeResponse(val email: String, val role: String)
+data class MeResponse(val email: String, val role: String, val provider: String = "LOCAL", val joinedAt: String? = null)
