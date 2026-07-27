@@ -10,6 +10,7 @@ import org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfig
 import org.springframework.test.context.ActiveProfiles
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import org.springframework.test.web.servlet.setup.DefaultMockMvcBuilder
@@ -203,6 +204,35 @@ class IdeaApiIntegrationTest {
             .andExpect(jsonPath("$.SCORED").value(0))
             .andExpect(jsonPath("$.NOTIFIED").value(0))
             .andExpect(jsonPath("$.REJECTED").value(0))
+    }
+
+    // ── Login validation ──────────────────────────────────────────────────────
+
+    @Test
+    fun `POST login with blank email returns 400`() {
+        mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"","password":"somepassword"}""")
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST login with invalid email format returns 400`() {
+        mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"not-an-email","password":"somepassword"}""")
+        ).andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `POST login with blank password returns 400`() {
+        mvc.perform(
+            post("/api/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"user@example.com","password":""}""")
+        ).andExpect(status().isBadRequest)
     }
 
     // ── Actuator health ───────────────────────────────────────────────────────
