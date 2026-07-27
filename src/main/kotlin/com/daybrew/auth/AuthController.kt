@@ -84,8 +84,21 @@ class AuthController(
                 role = role,
                 provider = user?.provider?.name ?: "LOCAL",
                 joinedAt = user?.createdAt?.toString(),
+                nickname = user?.nickname,
             )
         )
+    }
+
+    @PutMapping("/me/nickname")
+    fun updateNickname(@org.springframework.web.bind.annotation.RequestBody body: NicknameRequest): ResponseEntity<Void> {
+        val auth = SecurityContextHolder.getContext().authentication
+        if (auth == null || !auth.isAuthenticated || auth.principal == "anonymousUser") {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build()
+        }
+        val user = userRepository.findByEmail(auth.name) ?: return ResponseEntity.notFound().build()
+        user.nickname = body.nickname.trim().take(50).ifBlank { null }
+        userRepository.save(user)
+        return ResponseEntity.noContent().build()
     }
 
     @PostMapping("/logout")
@@ -113,4 +126,5 @@ data class LoginRequest(
     @field:NotBlank val password: String = "",
 )
 data class LoginResponse(val token: String)
-data class MeResponse(val email: String, val role: String, val provider: String = "LOCAL", val joinedAt: String? = null)
+data class MeResponse(val email: String, val role: String, val provider: String = "LOCAL", val joinedAt: String? = null, val nickname: String? = null)
+data class NicknameRequest(val nickname: String)

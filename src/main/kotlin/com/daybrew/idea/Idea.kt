@@ -71,6 +71,6 @@ class Idea(
     var updatedAt: OffsetDateTime = OffsetDateTime.now(),
 )
 
-enum class SourceTrack { SAAS, GITHUB, VIRAL }
+enum class SourceTrack { SAAS, GITHUB, VIRAL, HACKERNEWS }
 
 enum class IdeaStatus { PENDING, SCORED, NOTIFIED, REJECTED }

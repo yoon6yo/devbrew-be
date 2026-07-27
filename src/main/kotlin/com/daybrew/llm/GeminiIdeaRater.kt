@@ -87,12 +87,19 @@ Title: ${idea.title}
 Description: ${idea.description}
 Source: ${idea.sourceTrack}
 
-Axes:
+Axes (score each 1–10):
 - market_fit: Is there a real, painful problem? Is there a clearly defined audience willing to pay?
 - novelty: How differentiated is this from existing solutions?
 - feasibility: Can a small team (1-3 devs) realistically build and ship an MVP within 3 months?
 - monetization: Is there a clear, near-term revenue path (SaaS, marketplace fee, API pricing, etc.)?
 - trend: Does this ride a current wave (AI, no-code, developer tooling, etc.)?
+
+Scoring calibration — apply strictly:
+- 1–3: Weak. Major structural problem (no clear customer, copycat with no edge, impossible to build, no revenue path).
+- 4–6: Average. Viable but undifferentiated or with significant risks. Most ideas fall here.
+- 7: Genuinely strong. Clear pain, real differentiation, plausible path to revenue. Award sparingly — fewer than 20% of ideas.
+- 8: Exceptional. Evident competitive moat or breakout potential. Fewer than 5% of ideas.
+- 9–10: Extremely rare. Reserve only for once-in-a-generation concepts with near-certain demand.
 
 Respond with JSON only:
 {"market_fit":<1-10>,"novelty":<1-10>,"feasibility":<1-10>,"monetization":<1-10>,"trend":<1-10>,"reason":"<under 120 words summarising strengths and key risk>"}"""

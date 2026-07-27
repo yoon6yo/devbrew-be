@@ -30,4 +30,6 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
 
     @Query("SELECT new com.daybrew.idea.StatusCount(i.status, COUNT(i)) FROM Idea i GROUP BY i.status")
     fun countAllGroupedByStatus(): List<StatusCount>
+
+    fun deleteByStatusAndUpdatedAtBefore(status: IdeaStatus, cutoff: java.time.OffsetDateTime): Int
 }

@@ -1,6 +1,8 @@
 package com.daybrew.pipeline
 
+import com.daybrew.idea.IdeaRepository
 import com.daybrew.idea.IdeaService
+import com.daybrew.idea.IdeaStatus
 import com.daybrew.idea.SourceTrack
 import com.daybrew.llm.IdeaGenerator
 import com.daybrew.llm.IdeaRater
@@ -17,6 +19,7 @@ class PipelineScheduler(
     private val ideaGenerator: IdeaGenerator,
     private val ideaRater: IdeaRater,
     private val ideaService: IdeaService,
+    private val ideaRepository: IdeaRepository,
     private val slackNotifier: SlackNotifier,
 ) {
 
@@ -50,6 +53,15 @@ class PipelineScheduler(
         }
 
         log.info("Publish job complete — published ${top.size} ideas")
+    }
+
+    // Hard-delete REJECTED ideas older than 1 year — runs nightly at 03:30 UTC (12:30 KST)
+    @Async
+    @Scheduled(cron = "0 30 3 * * *")
+    fun hardDeleteRejected() {
+        val cutoff = java.time.OffsetDateTime.now().minusYears(1)
+        val deleted = ideaRepository.deleteByStatusAndUpdatedAtBefore(IdeaStatus.REJECTED, cutoff)
+        log.info("Hard-delete job: removed $deleted REJECTED ideas older than 1 year")
     }
 
     fun runPipeline(sources: Set<SourceTrack>?) {

@@ -26,6 +26,9 @@ class User(
     @Column(name = "provider_id")
     var providerId: String? = null,
 
+    @Column(name = "nickname", length = 50)
+    var nickname: String? = null,
+
     @Column(name = "created_at", nullable = false)
     val createdAt: OffsetDateTime = OffsetDateTime.now(),
 )
