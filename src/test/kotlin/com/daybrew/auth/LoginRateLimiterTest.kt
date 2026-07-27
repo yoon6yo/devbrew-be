@@ -43,4 +43,18 @@ class LoginRateLimiterTest {
         repeat(LoginRateLimiter.MAX_FAILURES) { limiter.recordFailure("1.2.3.4") }
         assertThat(limiter.isBlocked("5.6.7.8")).isFalse()
     }
+
+    @Test
+    fun `retryAfterSeconds returns positive value when key is locked`() {
+        repeat(LoginRateLimiter.MAX_FAILURES) { limiter.recordFailure("1.2.3.4") }
+        assertThat(limiter.isBlocked("1.2.3.4")).isTrue()
+        assertThat(limiter.retryAfterSeconds("1.2.3.4")).isGreaterThanOrEqualTo(1L)
+        assertThat(limiter.retryAfterSeconds("1.2.3.4"))
+            .isLessThanOrEqualTo(LoginRateLimiter.LOCKOUT_MS / 1000 + 1)
+    }
+
+    @Test
+    fun `retryAfterSeconds returns 1 for unknown key`() {
+        assertThat(limiter.retryAfterSeconds("unknown")).isEqualTo(1L)
+    }
 }
