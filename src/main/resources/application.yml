@@ -83,7 +83,7 @@ daybrew:
   gemini:
     api-key: ${GEMINI_API_KEY:}
     base-url: https://generativelanguage.googleapis.com
-    model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
+    model: ${GEMINI_MODEL:gemini-2.5-flash}
   pipeline:
     reddit:
       subreddits: SaaS,entrepreneur,startups
