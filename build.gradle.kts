@@ -41,6 +41,7 @@ dependencies {
     testImplementation("io.mockk:mockk:1.13.17")
     testImplementation("org.wiremock:wiremock-standalone:3.10.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testRuntimeOnly("com.h2database:h2")
 }
 
 kotlin {
