@@ -106,8 +106,8 @@ class GeminiIdeaGenerator(
 JSON만 응답 (마크다운 금지). 모든 필드 한국어:
 {
   "title": "'누가+무엇을+어떻게' 설명형 제목. 브랜드명 금지. 20자 이내.",
-  "description": "핵심 가치 1문장. '누가+어떤 문제+어떻게 해결'. 50자 이내.",
-  "purpose": "description과 겹치지 않는 타겟 사용자의 구체적 고통 시나리오. 2-3문장.",
+  "description": "2-3문장 핵심 피치. 문제→해결책→지금 해야 하는 이유 순서. purpose와 겹치지 않게 제품 가치 중심. 한국어.",
+  "purpose": "description과 다른 내용. 타겟 사용자가 일상에서 겪는 구체적 고통 시나리오. 2-3문장. 한국어.",
   "howItWorks": "4단계 흐름. 반드시 줄바꿈(\\n)으로 구분. 형식: '① 단계\\n② 단계\\n③ 단계\\n④ 단계'. 각 단계 30자 이내.",
   "suggestedStack": "핵심 기술명만 콤마 구분. 설명 없이. 예: 'React, FastAPI, PostgreSQL, Gemini API'"
 }"""
