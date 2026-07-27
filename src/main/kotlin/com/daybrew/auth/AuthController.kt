@@ -9,6 +9,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.ResponseCookie
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
+import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -45,7 +46,7 @@ class AuthController(
 
     @PostMapping("/login")
     @Operation(summary = "Login with email and password — returns a Bearer JWT")
-    fun login(@RequestBody req: LoginRequest, httpRequest: HttpServletRequest): ResponseEntity<LoginResponse> {
+    fun login(@RequestBody @Valid req: LoginRequest, httpRequest: HttpServletRequest): ResponseEntity<LoginResponse> {
         val ip = resolveClientIp(httpRequest)
 
         val emailKey = "email:${req.email}"
@@ -96,6 +97,9 @@ data class RegisterRequest(
     @field:Size(min = 8) val password: String = "",
 )
 
-data class LoginRequest(val email: String = "", val password: String = "")
+data class LoginRequest(
+    @field:Email @field:NotBlank val email: String = "",
+    @field:NotBlank val password: String = "",
+)
 data class LoginResponse(val token: String)
 data class MeResponse(val email: String, val role: String)

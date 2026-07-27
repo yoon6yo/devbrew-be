@@ -17,31 +17,35 @@ class LoginRateLimiter {
     private data class Entry(
         val failures: AtomicInteger = AtomicInteger(0),
         val lockedUntil: AtomicLong = AtomicLong(0),
+        val lastFailedAt: AtomicLong = AtomicLong(System.currentTimeMillis()),
     )
 
     private val store = ConcurrentHashMap<String, Entry>()
 
-    fun isBlocked(ip: String): Boolean {
-        val entry = store[ip] ?: return false
+    fun isBlocked(key: String): Boolean {
+        val entry = store[key] ?: return false
         return entry.lockedUntil.get() > System.currentTimeMillis()
     }
 
-    fun recordFailure(ip: String) {
-        val entry = store.computeIfAbsent(ip) { Entry() }
+    fun recordFailure(key: String) {
+        val entry = store.computeIfAbsent(key) { Entry() }
+        entry.lastFailedAt.set(System.currentTimeMillis())
         if (entry.failures.incrementAndGet() >= MAX_FAILURES) {
             entry.lockedUntil.set(System.currentTimeMillis() + LOCKOUT_MS)
         }
     }
 
-    fun recordSuccess(ip: String) {
-        store.remove(ip)
+    fun recordSuccess(key: String) {
+        store.remove(key)
     }
 
     @Scheduled(fixedDelay = 60_000)
     fun evictExpired() {
         val now = System.currentTimeMillis()
         store.entries.removeIf { (_, v) ->
-            v.lockedUntil.get() in 1 until now && v.failures.get() >= MAX_FAILURES
+            val lockUntil = v.lockedUntil.get()
+            if (lockUntil > 0) lockUntil < now
+            else v.lastFailedAt.get() + LOCKOUT_MS < now
         }
     }
 }

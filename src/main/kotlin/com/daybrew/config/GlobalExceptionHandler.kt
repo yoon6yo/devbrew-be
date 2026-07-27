@@ -3,6 +3,7 @@ package com.daybrew.config
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.http.ProblemDetail
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -29,6 +30,13 @@ class GlobalExceptionHandler {
     fun handleMissingHeader(ex: MissingRequestHeaderException): ProblemDetail {
         log.warn("Required header missing: ${ex.headerName}")
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Required header missing")
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException::class)
+    fun handleValidation(ex: MethodArgumentNotValidException): ProblemDetail {
+        val fields = ex.bindingResult.fieldErrors.joinToString(", ") { "${it.field}: ${it.defaultMessage}" }
+        log.warn("Validation failed: $fields")
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, fields)
     }
 
     @ExceptionHandler(Exception::class)
