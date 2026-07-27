@@ -47,15 +47,20 @@ class OAuth2SuccessHandler(
                 }
             val providerId = extractProviderId(provider, oAuth2User.attributes)
 
+            val providerNickname = extractNickname(provider, oAuth2User.attributes)
+
             val user = (userRepository.findByEmail(email)
                 ?: userRepository.findByProviderAndProviderId(provider, providerId)
                 ?: userRepository.save(User(email = email, provider = provider, providerId = providerId)))
                 .also { u ->
+                    var dirty = false
                     if (u.provider != provider || u.providerId != providerId) {
-                        u.provider = provider
-                        u.providerId = providerId
-                        userRepository.save(u)
+                        u.provider = provider; u.providerId = providerId; dirty = true
                     }
+                    if (u.nickname == null && providerNickname != null) {
+                        u.nickname = providerNickname; dirty = true
+                    }
+                    if (dirty) userRepository.save(u)
                 }
 
             if (email == props.admin.email && user.role != UserRole.ADMIN) {
@@ -87,6 +92,17 @@ class OAuth2SuccessHandler(
             @Suppress("UNCHECKED_CAST")
             (attrs["kakao_account"] as? Map<String, Any>)?.get("email") as? String
         }
+        Provider.LOCAL -> null
+    }
+
+    private fun extractNickname(provider: Provider, attrs: Map<String, Any>): String? = when (provider) {
+        Provider.GOOGLE -> attrs["given_name"] as? String ?: attrs["name"] as? String
+        Provider.KAKAO -> {
+            @Suppress("UNCHECKED_CAST")
+            val profile = (attrs["kakao_account"] as? Map<String, Any>)?.get("profile") as? Map<String, Any>
+            profile?.get("nickname") as? String
+        }
+        Provider.GITHUB -> attrs["name"] as? String ?: attrs["login"] as? String
         Provider.LOCAL -> null
     }
 
