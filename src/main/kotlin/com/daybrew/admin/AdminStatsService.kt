@@ -27,11 +27,10 @@ class AdminStatsService(
     @Transactional
     fun incrementPageViews() {
         val today = LocalDate.now()
-        val record = pageViewsRepository.findByViewDate(today)
-        if (record != null) {
-            record.count++
-        } else {
-            pageViewsRepository.save(DailyPageViews(viewDate = today, count = 1))
+        val updated = pageViewsRepository.incrementCount(today)
+        if (updated == 0) {
+            // First view of the day — insert new record; swallow duplicate on concurrent first-hit
+            runCatching { pageViewsRepository.save(DailyPageViews(viewDate = today, count = 1)) }
         }
     }
 

@@ -49,9 +49,9 @@ class AdminStatsServiceTest {
     // ── incrementPageViews ────────────────────────────────────────────────────
 
     @Test
-    fun `incrementPageViews creates new record when none exists for today`() {
+    fun `incrementPageViews saves new record when no row exists for today`() {
         val saved = slot<DailyPageViews>()
-        every { pageViewsRepository.findByViewDate(any()) } returns null
+        every { pageViewsRepository.incrementCount(any()) } returns 0
         every { pageViewsRepository.save(capture(saved)) } answers { saved.captured }
 
         service.incrementPageViews()
@@ -61,13 +61,11 @@ class AdminStatsServiceTest {
     }
 
     @Test
-    fun `incrementPageViews increments existing record count`() {
-        val existing = DailyPageViews(viewDate = LocalDate.now(), count = 5)
-        every { pageViewsRepository.findByViewDate(any()) } returns existing
+    fun `incrementPageViews uses atomic UPDATE when row already exists`() {
+        every { pageViewsRepository.incrementCount(any()) } returns 1
 
         service.incrementPageViews()
 
-        assertThat(existing.count).isEqualTo(6)
         verify(exactly = 0) { pageViewsRepository.save(any()) }
     }
 
