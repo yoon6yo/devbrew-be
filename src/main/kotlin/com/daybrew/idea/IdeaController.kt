@@ -30,6 +30,8 @@ class IdeaController(
     private val ideaService: IdeaService,
     private val adminStatsService: AdminStatsService,
     private val starRateLimiter: StarRateLimiter,
+    private val slackNotifier: com.daybrew.slack.SlackNotifier,
+    private val geminiIdeaRater: com.daybrew.llm.GeminiIdeaRater,
 ) {
 
     @GetMapping("/stats")
@@ -143,6 +145,26 @@ class IdeaController(
         val (idea, unstarred) = ideaService.unstarIdea(id, fingerprint)
         return if (unstarred) ResponseEntity.ok(idea.toDto())
         else ResponseEntity.notFound().build()
+    }
+
+    @PostMapping("/{id}/score")
+    @Operation(summary = "아이디어 수동 채점 (관리자 전용) — PENDING → SCORED")
+    @SecurityRequirement(name = "bearerAuth")
+    fun score(@PathVariable id: Long): ResponseEntity<IdeaDto> {
+        val idea = ideaService.getById(id)
+        val ratings = geminiIdeaRater.rateAll(listOf(idea))
+        val result = ratings[idea.id]
+            ?: return ResponseEntity.internalServerError().build()
+        return ResponseEntity.ok(ideaService.updateScore(idea.id, result).toDto())
+    }
+
+    @PostMapping("/{id}/notify")
+    @Operation(summary = "아이디어 수동 공시 (관리자 전용) — SCORED → NOTIFIED + Slack")
+    @SecurityRequirement(name = "bearerAuth")
+    fun notify(@PathVariable id: Long): ResponseEntity<IdeaDto> {
+        val idea = ideaService.getById(id)
+        slackNotifier.notifyIdea(idea)
+        return ResponseEntity.ok(ideaService.markNotified(idea.id).toDto())
     }
 
     @PostMapping("/{id}/reject")
