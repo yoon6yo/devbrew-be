@@ -35,7 +35,7 @@ class PipelineScheduler(
     @Scheduled(cron = "0 0 15 * * *")
     fun publishTopIdeas() {
         val top = ideaService.getScored()
-            .filter { it.score != null }
+            .filter { (it.score ?: 0) >= 6 }
             .sortedByDescending { it.score }
             .take(3)
 
