@@ -141,6 +141,48 @@ class IdeaServiceTest {
         verify(exactly = 0) { ideaRepository.existsByRawSignalAndSourceTrack(any(), any()) }
     }
 
+    // ── getStatusCounts ──────────────────────────────────────────────────────
+
+    @Test
+    fun `getStatusCounts returns count for each status`() {
+        every { ideaRepository.countAllGroupedByStatus() } returns listOf(
+            StatusCount(IdeaStatus.PENDING, 5L),
+            StatusCount(IdeaStatus.SCORED, 3L),
+            StatusCount(IdeaStatus.NOTIFIED, 2L),
+            StatusCount(IdeaStatus.REJECTED, 1L),
+        )
+
+        val result = service.getStatusCounts()
+
+        assertThat(result["PENDING"]).isEqualTo(5L)
+        assertThat(result["SCORED"]).isEqualTo(3L)
+        assertThat(result["NOTIFIED"]).isEqualTo(2L)
+        assertThat(result["REJECTED"]).isEqualTo(1L)
+    }
+
+    @Test
+    fun `getStatusCounts fills missing statuses with zero`() {
+        every { ideaRepository.countAllGroupedByStatus() } returns listOf(
+            StatusCount(IdeaStatus.NOTIFIED, 7L),
+        )
+
+        val result = service.getStatusCounts()
+
+        assertThat(result["NOTIFIED"]).isEqualTo(7L)
+        assertThat(result["PENDING"]).isEqualTo(0L)
+        assertThat(result["SCORED"]).isEqualTo(0L)
+        assertThat(result["REJECTED"]).isEqualTo(0L)
+    }
+
+    @Test
+    fun `getStatusCounts contains exactly all IdeaStatus keys`() {
+        every { ideaRepository.countAllGroupedByStatus() } returns emptyList()
+
+        val result = service.getStatusCounts()
+
+        assertThat(result.keys).containsExactlyInAnyOrderElementsOf(IdeaStatus.entries.map { it.name })
+    }
+
     // ── getPage ──────────────────────────────────────────────────────────────
 
     @Test
