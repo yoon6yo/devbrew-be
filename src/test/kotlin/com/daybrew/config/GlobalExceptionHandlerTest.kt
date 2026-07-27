@@ -1,9 +1,13 @@
 package com.daybrew.config
 
+import io.mockk.every
 import io.mockk.mockk
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
+import org.springframework.validation.BindingResult
+import org.springframework.validation.FieldError
+import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.MissingRequestHeaderException
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 
@@ -44,6 +48,25 @@ class GlobalExceptionHandlerTest {
         assertThat(detail.status).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR.value())
         assertThat(detail.properties).isNotNull
         assertThat(detail.properties!!).containsKey("correlationId")
+    }
+
+    @Test
+    fun `handleValidation returns 400 with field error details`() {
+        val fieldError = mockk<FieldError>()
+        every { fieldError.field } returns "email"
+        every { fieldError.defaultMessage } returns "must be a valid email"
+
+        val bindingResult = mockk<BindingResult>()
+        every { bindingResult.fieldErrors } returns listOf(fieldError)
+
+        val ex = mockk<MethodArgumentNotValidException>()
+        every { ex.bindingResult } returns bindingResult
+
+        val detail = handler.handleValidation(ex)
+
+        assertThat(detail.status).isEqualTo(HttpStatus.BAD_REQUEST.value())
+        assertThat(detail.detail).contains("email")
+        assertThat(detail.detail).contains("must be a valid email")
     }
 
     @Test
