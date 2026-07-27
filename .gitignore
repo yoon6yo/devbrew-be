@@ -28,3 +28,6 @@ application-local.yml
 ### Claude / OMC ###
 .claude/
 .omc/
+
+### Local notes ###
+status.md

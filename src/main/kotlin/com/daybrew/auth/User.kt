@@ -17,7 +17,7 @@ class User(
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    val role: UserRole = UserRole.USER,
+    var role: UserRole = UserRole.USER,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

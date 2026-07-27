@@ -4,6 +4,7 @@ import com.daybrew.auth.JwtAuthFilter
 import com.daybrew.auth.OAuth2SuccessHandler
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import jakarta.servlet.http.HttpServletResponse
 import org.springframework.http.HttpMethod
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity
@@ -66,6 +67,11 @@ class SecurityConfig(
             }
             .oauth2Login { oauth2 ->
                 oauth2.successHandler(oAuth2SuccessHandler)
+            }
+            .exceptionHandling { ex ->
+                ex.authenticationEntryPoint { _, response, _ ->
+                    response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")
+                }
             }
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter::class.java)
             .build()

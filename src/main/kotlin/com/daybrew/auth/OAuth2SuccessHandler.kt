@@ -44,6 +44,11 @@ class OAuth2SuccessHandler(
             ?: userRepository.findByProviderAndProviderId(provider, providerId)
             ?: userRepository.save(User(email = email, provider = provider, providerId = providerId))
 
+        if (email == props.admin.email && user.role != UserRole.ADMIN) {
+            user.role = UserRole.ADMIN
+            userRepository.save(user)
+        }
+
         val token = jwtTokenProvider.generate(user.id, user.email, user.role)
         // Deliver JWT via HttpOnly cookie to avoid URL/history/Referer leakage
         val cookie = Cookie("access_token", token).apply {

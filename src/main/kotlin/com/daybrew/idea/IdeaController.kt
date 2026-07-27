@@ -122,12 +122,6 @@ class IdeaController(
         ApiResponse(responseCode = "404", description = "스타하지 않은 아이디어 (취소할 대상 없음)", content = [Content(schema = Schema(hidden = true))]),
         ApiResponse(responseCode = "400", description = "X-Fingerprint 헤더 누락 또는 64자 초과", content = [Content(schema = Schema(hidden = true))]),
     )
-    private fun isPrivateAddress(addr: String): Boolean =
-        addr == "127.0.0.1" || addr == "::1" ||
-            addr.startsWith("10.") ||
-            addr.startsWith("192.168.") ||
-            Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(addr)
-
     fun unstar(
         @PathVariable id: Long,
         @Parameter(
@@ -143,6 +137,12 @@ class IdeaController(
         return if (unstarred) ResponseEntity.ok(idea.toDto())
         else ResponseEntity.notFound().build()
     }
+
+    private fun isPrivateAddress(addr: String): Boolean =
+        addr == "127.0.0.1" || addr == "::1" ||
+            addr.startsWith("10.") ||
+            addr.startsWith("192.168.") ||
+            Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(addr)
 
     @PostMapping("/{id}/reject")
     @Operation(
