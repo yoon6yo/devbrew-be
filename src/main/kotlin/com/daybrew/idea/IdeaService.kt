@@ -23,6 +23,9 @@ class IdeaService(
     fun getById(id: Long): Idea = ideaRepository.findById(id)
         .orElseThrow { NoSuchElementException("Idea not found: $id") }
 
+    fun getStatusCounts(): Map<String, Long> =
+        IdeaStatus.entries.associate { status -> status.name to ideaRepository.countByStatus(status) }
+
     fun getPending(): List<Idea> = ideaRepository.findByStatus(IdeaStatus.PENDING)
 
     fun getScored(): List<Idea> = ideaRepository.findByStatus(IdeaStatus.SCORED)

@@ -192,11 +192,36 @@ class IdeaApiIntegrationTest {
             .andExpect(jsonPath("$.message").value("Pipeline started"))
     }
 
+    // ── Idea stats endpoint ───────────────────────────────────────────────────
+
+    @Test
+    fun `GET ideas stats returns 200 with status counts`() {
+        saveIdea()
+        mvc.perform(get("/api/ideas/stats"))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.PENDING").value(1))
+            .andExpect(jsonPath("$.SCORED").value(0))
+            .andExpect(jsonPath("$.NOTIFIED").value(0))
+            .andExpect(jsonPath("$.REJECTED").value(0))
+    }
+
     // ── Actuator health ───────────────────────────────────────────────────────
 
     @Test
     fun `GET actuator health returns 200 without authentication`() {
         mvc.perform(get("/actuator/health"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `GET actuator health liveness returns 200`() {
+        mvc.perform(get("/actuator/health/liveness"))
+            .andExpect(status().isOk)
+    }
+
+    @Test
+    fun `GET actuator health readiness returns 200`() {
+        mvc.perform(get("/actuator/health/readiness"))
             .andExpect(status().isOk)
     }
 

@@ -20,4 +20,6 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
     fun findAllOrderedByScore(): List<Idea>
 
     fun findByStatus(status: IdeaStatus, pageable: Pageable): Page<Idea>
+
+    fun countByStatus(status: IdeaStatus): Long
 }

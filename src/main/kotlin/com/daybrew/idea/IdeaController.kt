@@ -30,6 +30,10 @@ class IdeaController(
     private val starRateLimiter: StarRateLimiter,
 ) {
 
+    @GetMapping("/stats")
+    @Operation(summary = "상태별 아이디어 수 집계", description = "인증 불필요.")
+    fun stats(): Map<String, Long> = ideaService.getStatusCounts()
+
     @GetMapping
     @Operation(
         summary = "아이디어 목록 조회 (페이지네이션)",
