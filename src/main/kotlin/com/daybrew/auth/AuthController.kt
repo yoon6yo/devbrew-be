@@ -1,5 +1,6 @@
 package com.daybrew.auth
 
+import com.daybrew.config.resolveClientIp
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.servlet.http.HttpServletRequest
@@ -45,7 +46,7 @@ class AuthController(
     @PostMapping("/login")
     @Operation(summary = "Login with email and password — returns a Bearer JWT")
     fun login(@RequestBody req: LoginRequest, httpRequest: HttpServletRequest): ResponseEntity<LoginResponse> {
-        val ip = httpRequest.remoteAddr
+        val ip = resolveClientIp(httpRequest)
 
         val emailKey = "email:${req.email}"
         if (rateLimiter.isBlocked(ip) || rateLimiter.isBlocked(emailKey)) {

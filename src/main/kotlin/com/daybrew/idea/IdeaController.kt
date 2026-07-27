@@ -1,5 +1,6 @@
 package com.daybrew.idea
 
+import com.daybrew.config.resolveClientIp
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
 import io.swagger.v3.oas.annotations.enums.ParameterIn
@@ -96,10 +97,7 @@ class IdeaController(
         @RequestHeader("X-Fingerprint") fingerprint: String,
         request: HttpServletRequest,
     ): ResponseEntity<IdeaDto> {
-        val directPeer = request.remoteAddr
-        val ip = if (isPrivateAddress(directPeer))
-            request.getHeader("X-Real-IP")?.takeIf { it.isNotBlank() } ?: directPeer
-        else directPeer
+        val ip = resolveClientIp(request)
         val retryAfter = starRateLimiter.checkAndRecord(ip)
         if (retryAfter != null) {
             return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -141,12 +139,6 @@ class IdeaController(
         return if (unstarred) ResponseEntity.ok(idea.toDto())
         else ResponseEntity.notFound().build()
     }
-
-    private fun isPrivateAddress(addr: String): Boolean =
-        addr == "127.0.0.1" || addr == "::1" ||
-            addr.startsWith("10.") ||
-            addr.startsWith("192.168.") ||
-            Regex("""^172\.(1[6-9]|2\d|3[01])\.""").containsMatchIn(addr)
 
     @PostMapping("/{id}/reject")
     @Operation(
