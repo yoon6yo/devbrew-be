@@ -7,4 +7,5 @@ data class RawSignal(
     val body: String,
     val url: String?,
     val track: SourceTrack,
+    val engagementScore: Int? = null,
 )

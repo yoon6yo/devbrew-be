@@ -56,35 +56,55 @@ class PipelineScheduler(
         log.info("Pipeline started — sources={}", sources ?: "ALL")
         val signals = collectors.flatMap { it.collect() }
             .let { all -> if (sources != null) all.filter { it.track in sources } else all }
-        log.info("Collected ${signals.size} raw signals")
+        log.info("Collected ${signals.size} raw signals (pre-filtered by engagement)")
 
-        val newIdeas = signals
+        // generate + embedded score in one API call each
+        val results = signals
             .filter { signal -> !ideaService.isDuplicate(signal.url, signal.body, signal.track) }
             .mapNotNull { signal ->
                 runCatching { ideaGenerator.generate(signal) }
                     .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
                     .getOrNull()
             }
-            .map { ideaService.save(it) }
 
-        log.info("Saved ${newIdeas.size} new ideas")
+        val savedWithScore = results.map { result ->
+            val saved = ideaService.save(result.idea)
+            saved to result.score
+        }
 
-        if (newIdeas.isEmpty()) {
-            log.info("Pipeline complete — no new ideas to rate")
+        log.info("Saved ${savedWithScore.size} new ideas")
+        if (savedWithScore.isEmpty()) {
+            log.info("Pipeline complete — no new ideas")
             return
         }
 
-        val ratings = runCatching { ideaRater.rateAll(newIdeas) }
-            .onFailure { log.warn("Batch rating failed", it) }
-            .getOrDefault(emptyMap())
+        // apply embedded scores; fall back to rateAll only for parse failures
+        val needsRating = mutableListOf<com.daybrew.idea.Idea>()
+        var scoredCount = 0
 
-        val scored = newIdeas.mapNotNull { idea ->
-            val result = ratings[idea.id] ?: return@mapNotNull null
-            runCatching { ideaService.updateScore(idea.id, result) }
-                .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
-                .getOrNull()
+        savedWithScore.forEach { (idea, score) ->
+            if (score != null) {
+                runCatching { ideaService.updateScore(idea.id, score) }
+                    .onSuccess { scoredCount++ }
+                    .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+            } else {
+                needsRating += idea
+            }
         }
 
-        log.info("Pipeline complete — scored=${scored.size}")
+        if (needsRating.isNotEmpty()) {
+            log.info("Fallback rating for ${needsRating.size} ideas without embedded score")
+            val ratings = runCatching { ideaRater.rateAll(needsRating) }
+                .onFailure { log.warn("Fallback batch rating failed", it) }
+                .getOrDefault(emptyMap())
+            needsRating.forEach { idea ->
+                val result = ratings[idea.id] ?: return@forEach
+                runCatching { ideaService.updateScore(idea.id, result) }
+                    .onSuccess { scoredCount++ }
+                    .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+            }
+        }
+
+        log.info("Pipeline complete — scored=$scoredCount, fallback=${needsRating.size}")
     }
 }

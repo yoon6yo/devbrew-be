@@ -20,7 +20,7 @@ class GeminiIdeaGenerator(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    override fun generate(signal: RawSignal): Idea {
+    override fun generate(signal: RawSignal): GeneratedResult {
         val uri = "${props.gemini.baseUrl}/v1/models/${props.gemini.model}:generateContent"
 
         @Suppress("UNCHECKED_CAST")
@@ -31,7 +31,7 @@ class GeminiIdeaGenerator(
                 mapOf(
                     "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
                     "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to buildPrompt(signal))))),
-                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 800),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 900),
                 )
             )
             .retrieve()
@@ -48,13 +48,14 @@ class GeminiIdeaGenerator(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun parseResponse(response: Map<*, *>, signal: RawSignal): Idea {
+    private fun parseResponse(response: Map<*, *>, signal: RawSignal): GeneratedResult {
         return try {
             val candidates = response["candidates"] as List<Map<*, *>>
             val parts = (candidates[0]["content"] as Map<*, *>)["parts"] as List<Map<*, *>>
             val text = parts[0]["text"] as String
             val parsed = objectMapper.readValue(text, Map::class.java)
-            Idea(
+
+            val idea = Idea(
                 title = parsed["title"] as String,
                 description = parsed["description"] as String,
                 purpose = parsed["purpose"] as? String,
@@ -65,14 +66,23 @@ class GeminiIdeaGenerator(
                 sourceUrl = signal.url,
                 rawSignal = signal.body,
             )
+
+            val score = runCatching {
+                val s = parsed["score"] as Map<*, *>
+                fun sc(key: String) = (s[key] as Number).toInt().coerceIn(1, 10).toShort()
+                val mf = sc("market_fit"); val nv = sc("novelty")
+                val fe = sc("feasibility"); val mn = sc("monetization"); val tr = sc("trend")
+                val weighted = ((mf * 30 + nv * 20 + fe * 20 + mn * 20 + tr * 10) / 100).coerceIn(1, 10).toShort()
+                ScoreResult(weighted, mf, nv, fe, mn, tr, s["reason"] as String)
+            }.getOrNull()
+
+            GeneratedResult(idea, score)
         } catch (e: Exception) {
             log.warn("Failed to parse Gemini JSON response, using signal as fallback", e)
-            Idea(
-                title = signal.title,
-                description = signal.body,
-                sourceTrack = signal.track,
-                sourceUrl = signal.url,
-                rawSignal = signal.body,
+            GeneratedResult(
+                Idea(title = signal.title, description = signal.body,
+                    sourceTrack = signal.track, sourceUrl = signal.url, rawSignal = signal.body),
+                null
             )
         }
     }
@@ -104,14 +114,22 @@ class GeminiIdeaGenerator(
         val body = normalize(signal.body)
         return """신호: $title / $body
 
-JSON만 응답 (마크다운 금지). 모든 필드 한국어:
+JSON만 응답 (마크다운 금지). 아이디어 생성 후 즉시 채점하라. 모든 텍스트 필드 한국어:
 {
   "title": "'누가+무엇을+어떻게' 설명형 제목. 브랜드명 금지. 20자 이내.",
-  "description": "2-3문장 핵심 피치. 문제→해결책→지금 해야 하는 이유 순서. purpose와 겹치지 않게 제품 가치 중심. 한국어.",
-  "purpose": "description과 다른 내용. 타겟 사용자가 일상에서 겪는 구체적 고통 시나리오. 2-3문장. 한국어.",
-  "howItWorks": "4단계 사용 흐름. 반드시 줄바꿈(\\n)으로 구분. 형식: '① 단계\\n② 단계\\n③ 단계\\n④ 단계'. 각 단계 30자 이내. AI가 쓴 것처럼 딱딱하거나 기술 용어를 남발하지 말고 실제 사용자가 경험하는 것처럼 자연스럽고 간결하게.",
-  "suggestedStack": "핵심 기술명만 콤마 구분. 설명 없이. 예: 'React, FastAPI, PostgreSQL, Gemini API'",
-  "implementationGuide": "3개 핵심 구현 기술. 기술명은 영어 원명 그대로 사용 (예: FastAPI, LangChain, Pinecone). 설명만 한국어. 형식 엄수: '1. 기술명\n- 사용 목적: 1문장\n- 구현: 1-2문장\n2. 기술명\n- 사용 목적: ...\n- 구현: ...\n3. 기술명\n- 사용 목적: ...\n- 구현: ...'."
+  "description": "2-3문장 핵심 피치. 문제→해결책→지금 해야 하는 이유 순서. purpose와 겹치지 않게 제품 가치 중심.",
+  "purpose": "description과 다른 내용. 타겟 사용자가 일상에서 겪는 구체적 고통 시나리오. 2-3문장.",
+  "howItWorks": "4단계 사용 흐름. 형식: '① 단계\\n② 단계\\n③ 단계\\n④ 단계'. 각 단계 30자 이내.",
+  "suggestedStack": "핵심 기술명만 콤마 구분. 예: 'React, FastAPI, PostgreSQL'",
+  "implementationGuide": "3개 핵심 구현 기술. 형식: '1. 기술명\n- 사용 목적: 1문장\n- 구현: 1-2문장\n2. ...\n3. ...'",
+  "score": {
+    "market_fit": <1-10 실제 고통이 있고 돈 낼 의향이 있는 고객이 존재하는가>,
+    "novelty": <1-10 기존 솔루션과 얼마나 차별화되는가>,
+    "feasibility": <1-10 1-3인 팀이 3개월 내 MVP 출시 가능한가>,
+    "monetization": <1-10 명확한 단기 수익 모델이 있는가>,
+    "trend": <1-10 AI·노코드·개발자 툴링 등 현재 트렌드를 타는가>,
+    "reason": "<강점과 핵심 리스크 120자 이내 한국어 요약>"
+  }
 }"""
     }
 }

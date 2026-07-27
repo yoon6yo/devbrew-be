@@ -91,11 +91,15 @@ class RedditCollector(
 
                 if (selftext.length < 100) return@mapNotNull null
 
+                val upvotes = (data["score"] as? Number)?.toInt() ?: 0
+                if (upvotes < 50) return@mapNotNull null
+
                 RawSignal(
                     title = title,
                     body = selftext.take(800),
                     url = permalink?.let { "https://www.reddit.com$it" },
                     track = SourceTrack.SAAS,
+                    engagementScore = upvotes,
                 )
             }
         } catch (e: Exception) {
