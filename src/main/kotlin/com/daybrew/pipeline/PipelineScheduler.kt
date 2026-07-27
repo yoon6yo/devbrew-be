@@ -69,7 +69,7 @@ class PipelineScheduler(
     }
 
     private fun notifyTopIdeas(ideas: List<Idea>) {
-        ideas.forEach { idea ->
+        ideas.parallelStream().forEach { idea ->
             val sent = runCatching { slackNotifier.notifyIdea(idea) }
                 .onFailure { log.warn("Slack notification failed for idea: ${idea.id}", it) }
                 .isSuccess
