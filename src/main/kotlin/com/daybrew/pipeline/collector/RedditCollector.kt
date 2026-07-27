@@ -15,12 +15,14 @@ import java.util.Base64
 @Component
 class RedditCollector(
     @Value("\${daybrew.pipeline.reddit.subreddits}") private val subredditsRaw: String,
+    @Value("\${daybrew.pipeline.reddit.viral-subreddits:}") private val viralSubredditsRaw: String,
     @Value("\${daybrew.pipeline.reddit.user-agent}") private val userAgent: String,
     private val props: DayBrewProperties,
 ) : IdeaCollector {
 
     private val log = LoggerFactory.getLogger(javaClass)
-    private val subreddits = subredditsRaw.split(",").map { it.trim() }
+    private val subreddits = subredditsRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
+    private val viralSubreddits = viralSubredditsRaw.split(",").map { it.trim() }.filter { it.isNotBlank() }
 
     private val authClient = WebClient.builder()
         .baseUrl("https://www.reddit.com")
@@ -40,7 +42,8 @@ class RedditCollector(
             return emptyList()
         }
         val token = fetchAccessToken(clientId, clientSecret) ?: return emptyList()
-        return subreddits.flatMap { collectSubreddit(it, token) }
+        return subreddits.flatMap { collectSubreddit(it, token) } +
+               viralSubreddits.flatMap { collectViralSubreddit(it, token) }
     }
 
     @Suppress("UNCHECKED_CAST")
@@ -104,6 +107,53 @@ class RedditCollector(
             }
         } catch (e: Exception) {
             log.warn("Reddit collection failed for r/$subreddit: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun collectViralSubreddit(subreddit: String, token: String): List<RawSignal> {
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            val response = apiClient.get()
+                .uri("/r/$subreddit/top?t=week&limit=20")
+                .header("Authorization", "Bearer $token")
+                .retrieve()
+                .bodyToMono<Map<String, Any>>()
+                .block() ?: return emptyList()
+
+            val children = ((response["data"] as? Map<*, *>)?.get("children") as? List<*>)
+                ?: return emptyList()
+
+            children.mapNotNull { child ->
+                @Suppress("UNCHECKED_CAST")
+                val data = (child as? Map<*, *>)?.get("data") as? Map<String, Any>
+                    ?: return@mapNotNull null
+
+                val title = data["title"] as? String ?: return@mapNotNull null
+                if (title.length < 25) return@mapNotNull null
+
+                val upvotes = (data["score"] as? Number)?.toInt() ?: 0
+                if (upvotes < 100) return@mapNotNull null
+
+                val selftext = data["selftext"] as? String ?: ""
+                val permalink = data["permalink"] as? String
+
+                // Use title + selftext as signal; selftext may be empty for link posts
+                val body = buildString {
+                    append(title)
+                    if (selftext.length > 30) { append("\n\n"); append(selftext.take(700)) }
+                }
+
+                RawSignal(
+                    title = title,
+                    body = body,
+                    url = permalink?.let { "https://www.reddit.com$it" },
+                    track = SourceTrack.VIRAL,
+                    engagementScore = upvotes,
+                )
+            }
+        } catch (e: Exception) {
+            log.warn("Reddit viral collection failed for r/$subreddit: ${e.message}")
             emptyList()
         }
     }

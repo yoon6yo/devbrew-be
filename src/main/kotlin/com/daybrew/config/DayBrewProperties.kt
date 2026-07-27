@@ -37,15 +37,8 @@ data class DayBrewProperties(
     )
 
     data class PipelineProps(
-        val viral: ViralProps = ViralProps(),
         val reddit: RedditProps = RedditProps(),
     ) {
-        data class ViralProps(
-            val seedTopics: List<String> = listOf(
-                "browser-extension", "cli-tool", "discord-bot", "notion-integration", "chrome-extension"
-            ),
-        )
-
         data class RedditProps(
             val clientId: String = "",
             val clientSecret: String = "",

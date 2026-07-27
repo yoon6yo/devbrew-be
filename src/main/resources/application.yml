@@ -86,7 +86,8 @@ daybrew:
     model: ${GEMINI_MODEL:gemini-3.5-flash-lite}
   pipeline:
     reddit:
-      subreddits: SaaS,entrepreneur,startups,webdev,programming
+      subreddits: SaaS,entrepreneur,startups
+      viral-subreddits: InternetIsBeautiful,SideProject,webdev
       user-agent: daybrew/1.0 (idea-curator)
       client-id: ${REDDIT_CLIENT_ID:}
       client-secret: ${REDDIT_CLIENT_SECRET:}
@@ -94,10 +95,3 @@ daybrew:
       pat: ${GITHUB_PAT:}
       min-stars: 100
       max-stars: 2000
-    viral:
-      seed-topics:
-        - browser-extension
-        - cli-tool
-        - discord-bot
-        - notion-integration
-        - chrome-extension
