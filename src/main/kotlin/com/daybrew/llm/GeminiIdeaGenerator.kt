@@ -31,7 +31,7 @@ class GeminiIdeaGenerator(
                 mapOf(
                     "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
                     "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to buildPrompt(signal))))),
-                    "generationConfig" to mapOf("responseMimeType" to "application/json"),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 400),
                 )
             )
             .retrieve()
@@ -77,29 +77,18 @@ class GeminiIdeaGenerator(
     }
 
     private fun systemInstruction(track: SourceTrack): String = when (track) {
-        SourceTrack.SAAS -> """당신은 B2B SaaS 분야에서 15년 경력을 가진 시니어 프로덕트 전략가이자 스타트업 어드바이저입니다.
-주어진 시장 신호에서 가장 날카로운 스타트업 아이디어를 도출하는 것이 당신의 임무입니다.
-규칙:
-- 아이디어는 구체적이어야 합니다. 정확한 타겟 고객을 명시하세요 (예: "혼자 운영하는 인디 해커" / "스타트업 초기 단계 CTO" 등).
-- 문제는 실제 고통이어야 합니다. 있으면 좋은 수준이 아닌, 없으면 안 되는 문제.
-- 개발자가 내일 당장 만들기 시작할 수 있을 만큼 구체적으로 서술하세요.
-- 모든 응답은 반드시 한국어로 작성하세요. 영어 사용 금지."""
-        SourceTrack.GITHUB -> """당신은 개발자 출신 프로덕트 매니저로, 오픈소스 트렌드에 숨겨진 사업 기회를 발굴하는 전문가입니다.
-GitHub 프로젝트나 트렌드를 보고, 기술이 제품화되었을 때 비개발자가 돈을 낼 만한 제품 기회를 찾아내는 것이 임무입니다.
-규칙:
-- 현재 오픈소스 툴에서 소외된 사용자층을 식별하세요.
-- 원시 기술 위에 실질적인 가치를 더하는 제품이어야 합니다.
-- 누가 살 것이며, 어떻게 그들에게 도달할지 중심으로 생각하세요.
-- 통합 포인트와 자동화 기회를 구체적으로 제시하세요.
-- 모든 응답은 반드시 한국어로 작성하세요. 영어 사용 금지."""
-        SourceTrack.VIRAL -> """당신은 100만 다운로드 이상의 앱을 세 개 출시한 경험 있는 컨슈머 프로덕트 디자이너입니다.
-바이럴 개념이나 트렌드를 바탕으로 실제 만들 수 있는 구체적인 소비자 제품을 설계하는 것이 임무입니다.
-규칙:
-- 제품은 진짜 인간적인 감정이나 사회적 행동을 건드려야 합니다.
-- 사용자의 하루 중 정확히 어떤 순간에 이 제품을 쓰는지 명시하세요.
-- 공유 욕구(훅)가 핵심 경험 자체에 내장되어야 합니다.
-- 구체적인 바이럴 루프나 성장 메커니즘을 제안하세요.
-- 모든 응답은 반드시 한국어로 작성하세요. 영어 사용 금지."""
+        SourceTrack.SAAS -> """B2B SaaS 프로덕트 전략가입니다. 시장 신호에서 날카로운 스타트업 아이디어를 도출하세요.
+- 정확한 타겟 고객 명시 (예: "혼자 운영하는 인디 해커")
+- 없으면 안 되는 문제, 구체적 해결책
+- 모든 응답 한국어. 영어 금지."""
+        SourceTrack.GITHUB -> """GitHub 오픈소스 트렌드에서 사업 기회를 발굴하는 개발자 출신 PM입니다.
+- 비개발자가 돈을 낼 만한 제품 기회 발굴
+- 누가 살 것이며 어떻게 도달할지 중심
+- 모든 응답 한국어. 영어 금지."""
+        SourceTrack.VIRAL -> """바이럴 트렌드를 실제 제품으로 설계하는 컨슈머 프로덕트 디자이너입니다.
+- 진짜 인간적 감정이나 사회적 행동을 건드릴 것
+- 공유 욕구가 핵심 경험에 내장되어야 함
+- 모든 응답 한국어. 영어 금지."""
     }
 
     private fun normalize(text: String): String = text
@@ -107,28 +96,20 @@ GitHub 프로젝트나 트렌드를 보고, 기술이 제품화되었을 때 비
         .replace(Regex("https?://\\S+"), "")
         .replace(Regex("\\s+"), " ")
         .trim()
-        .take(2000)
+        .take(800)
 
     private fun buildPrompt(signal: RawSignal): String {
         val title = normalize(signal.title)
         val body = normalize(signal.body)
-        return """## 시장 신호
+        return """신호: $title / $body
 
-제목: $title
-
-본문: $body
-
-## 작업 지시
-
-위 신호를 깊이 분석하여 날카롭고 실행 가능한 스타트업 아이디어를 도출하세요. 막연한 일반론은 금지입니다.
-
-JSON만 응답하세요 (마크다운, JSON 외 설명 일절 금지). 모든 필드는 반드시 한국어로 작성하세요:
+JSON만 응답 (마크다운 금지). 모든 필드 한국어:
 {
-  "title": "이 서비스가 무엇을 하는지 바로 알 수 있는 설명형 제목. 브랜드명·제품명 스타일 금지. '누가 + 무엇을 + 어떻게' 구조. 예: '1인 SaaS 이탈 사용자 자동 복귀 이메일', 'GitHub 트렌드 기반 SaaS 아이디어 일간 요약', '프리랜서 계약서 자동 생성 및 전자서명 도구'. 한국어, 20자 이내.",
-  "description": "3-4문장 투자자 피치. 구체적인 문제 → 해결책 → 지금 해야 하는 이유 순서. 회의적인 투자자를 설득하듯 자신 있게. 한국어.",
-  "purpose": "정확히 누가, 어떤 상황에서, 어떤 고통을 겪는지 구체적으로 서술. 막연한 표현 금지. 실제 사용자 시나리오로 설명 (3-4문장). 한국어.",
-  "howItWorks": "사용자 관점에서 단계별로 설명. 각 단계는 번호로 시작. 핵심 기술/자동화 포인트 명시. 최소 4단계. 한국어.",
-  "suggestedStack": "구체적인 기술 스택: 프론트엔드, 백엔드, DB, 핵심 라이브러리/API를 각각 명시하고 이유도 한 줄씩. 한국어."
+  "title": "'누가+무엇을+어떻게' 설명형 제목. 브랜드명 금지. 20자 이내.",
+  "description": "핵심 가치 1문장. '누가+어떤 문제+어떻게 해결'. 50자 이내.",
+  "purpose": "description과 겹치지 않는 타겟 사용자의 구체적 고통 시나리오. 2-3문장.",
+  "howItWorks": "4단계 흐름. 반드시 줄바꿈(\\n)으로 구분. 형식: '① 단계\\n② 단계\\n③ 단계\\n④ 단계'. 각 단계 30자 이내.",
+  "suggestedStack": "핵심 기술명만 콤마 구분. 설명 없이. 예: 'React, FastAPI, PostgreSQL, Gemini API'"
 }"""
     }
 }

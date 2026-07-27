@@ -71,7 +71,7 @@ class RedditCollector(
         return try {
             @Suppress("UNCHECKED_CAST")
             val response = apiClient.get()
-                .uri("/r/$subreddit/hot?limit=25")
+                .uri("/r/$subreddit/hot?limit=15")
                 .header("Authorization", "Bearer $token")
                 .retrieve()
                 .bodyToMono<Map<String, Any>>()
@@ -93,7 +93,7 @@ class RedditCollector(
 
                 RawSignal(
                     title = title,
-                    body = selftext.take(2000),
+                    body = selftext.take(800),
                     url = permalink?.let { "https://www.reddit.com$it" },
                     track = SourceTrack.SAAS,
                 )

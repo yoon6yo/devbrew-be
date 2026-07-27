@@ -46,7 +46,7 @@ class GeminiIdeaRater(
             .header("x-goog-api-key", props.gemini.apiKey)
             .bodyValue(mapOf(
                 "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to ratingPrompt(idea))))),
-                "generationConfig" to mapOf("responseMimeType" to "application/json"),
+                "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 300),
             ))
             .retrieve()
             .bodyToMono(Map::class.java)

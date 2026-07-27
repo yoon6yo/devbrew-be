@@ -31,7 +31,7 @@ class GithubCollector(
 
         return try {
             val response = client.get()
-                .uri("/search/repositories?q=stars:$minStars..$maxStars+archived:false&sort=updated&order=desc&per_page=30")
+                .uri("/search/repositories?q=stars:$minStars..$maxStars+archived:false&sort=updated&order=desc&per_page=20")
                 .retrieve()
                 .bodyToMono<Map<String, Any>>()
                 .block() ?: return emptyList()
