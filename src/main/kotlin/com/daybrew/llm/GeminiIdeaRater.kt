@@ -1,21 +1,16 @@
 package com.daybrew.llm
 
 import com.daybrew.admin.AdminStatsService
-import com.daybrew.config.DayBrewProperties
 import com.daybrew.idea.Idea
 import com.fasterxml.jackson.databind.ObjectMapper
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
-import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 
 @Component
 class GeminiIdeaRater(
-    private val webClient: WebClient,
-    private val props: DayBrewProperties,
     private val objectMapper: ObjectMapper,
     private val adminStatsService: AdminStatsService,
+    private val batchClient: GeminiBatchClient,
 ) : IdeaRater {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -23,61 +18,49 @@ class GeminiIdeaRater(
     override fun rateAll(ideas: List<Idea>): Map<Long, ScoreResult> {
         if (ideas.isEmpty()) return emptyMap()
 
-        log.info("Rating ${ideas.size} ideas via Gemini (concurrent)")
+        log.info("Rating ${ideas.size} ideas via Gemini Batch API")
 
-        return Flux.fromIterable(ideas)
-            .flatMap { idea ->
-                rateOne(idea).onErrorResume { e ->
-                    log.warn("Rating failed for idea ${idea.id}", e)
-                    Mono.empty<Pair<Long, ScoreResult>>()
-                }
+        val requests = ideas.map { idea ->
+            BatchRequest(
+                key = "idea-${idea.id}",
+                body = mapOf(
+                    "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to ratingPrompt(idea))))),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 300),
+                )
+            )
+        }
+
+        val responses = batchClient.submitAndAwait(requests, "daybrew-rate")
+        var totalPrompt = 0; var totalCompletion = 0
+
+        val result = ideas.mapNotNull { idea ->
+            val resp = responses["idea-${idea.id}"] ?: return@mapNotNull null
+            (resp["usageMetadata"] as? Map<*, *>)?.let { u ->
+                totalPrompt += (u["promptTokenCount"] as? Number)?.toInt() ?: 0
+                totalCompletion += (u["candidatesTokenCount"] as? Number)?.toInt() ?: 0
             }
-            .collectList()
-            .block()
-            ?.toMap()
-            ?: emptyMap()
+            runCatching { parseRating(idea, resp) }
+                .onFailure { log.warn("Rating parse failed for idea ${idea.id}", it) }
+                .getOrNull()
+        }.toMap()
+
+        runCatching { adminStatsService.recordGeminiUsage("rate-batch", totalPrompt, totalCompletion) }
+        return result
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun rateOne(idea: Idea): Mono<Pair<Long, ScoreResult>> {
-        val uri = "${props.gemini.baseUrl}/v1/models/${props.gemini.model}:generateContent"
-        return webClient.post()
-            .uri(uri)
-            .header("x-goog-api-key", props.gemini.apiKey)
-            .bodyValue(mapOf(
-                "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to ratingPrompt(idea))))),
-                "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 300),
-            ))
-            .retrieve()
-            .bodyToMono(Map::class.java)
-            .map { response ->
-                val candidates = response["candidates"] as List<Map<*, *>>
-                val parts = (candidates[0]["content"] as Map<*, *>)["parts"] as List<Map<*, *>>
-                val text = parts[0]["text"] as String
-                val parsed = objectMapper.readValue(text, Map::class.java)
+    private fun parseRating(idea: Idea, response: Map<String, Any>): Pair<Long, ScoreResult> {
+        val candidates = response["candidates"] as List<Map<*, *>>
+        val parts = (candidates[0]["content"] as Map<*, *>)["parts"] as List<Map<*, *>>
+        val text = parts[0]["text"] as String
+        val parsed = objectMapper.readValue(text, Map::class.java)
 
-                fun score(key: String) = (parsed[key] as Number).toInt().coerceIn(1, 10).toShort()
-                val marketFit    = score("market_fit")
-                val novelty      = score("novelty")
-                val feasibility  = score("feasibility")
-                val monetization = score("monetization")
-                val trend        = score("trend")
+        fun sc(key: String) = (parsed[key] as Number).toInt().coerceIn(1, 10).toShort()
+        val mf = sc("market_fit"); val nv = sc("novelty")
+        val fe = sc("feasibility"); val mn = sc("monetization"); val tr = sc("trend")
+        val weighted = ((mf * 30 + nv * 20 + fe * 20 + mn * 20 + tr * 10) / 100).coerceIn(1, 10).toShort()
 
-                // Weighted: market_fit 30%, novelty 20%, feasibility 20%, monetization 20%, trend 10%
-                // Integer arithmetic to avoid floating-point rounding errors
-                val weighted = ((marketFit.toInt() * 30 + novelty.toInt() * 20 + feasibility.toInt() * 20 +
-                        monetization.toInt() * 20 + trend.toInt() * 10) / 100).coerceIn(1, 10).toShort()
-
-                val reason = parsed["reason"] as String
-
-                (response["usageMetadata"] as? Map<*, *>)?.let { usage ->
-                    val prompt = (usage["promptTokenCount"] as? Number)?.toInt() ?: 0
-                    val completion = (usage["candidatesTokenCount"] as? Number)?.toInt() ?: 0
-                    runCatching { adminStatsService.recordGeminiUsage("rate", prompt, completion) }
-                }
-
-                idea.id to ScoreResult(weighted, marketFit, novelty, feasibility, monetization, trend, reason)
-            }
+        return idea.id to ScoreResult(weighted, mf, nv, fe, mn, tr, parsed["reason"] as String)
     }
 
     private fun ratingPrompt(idea: Idea): String =

@@ -16,6 +16,7 @@ class GeminiIdeaGenerator(
     private val props: DayBrewProperties,
     private val objectMapper: ObjectMapper,
     private val adminStatsService: AdminStatsService,
+    private val batchClient: GeminiBatchClient,
 ) : IdeaGenerator {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -45,6 +46,42 @@ class GeminiIdeaGenerator(
         }
 
         return parseResponse(response, signal)
+    }
+
+    override fun generateBatch(signals: List<RawSignal>): List<GeneratedResult> {
+        if (signals.isEmpty()) return emptyList()
+        val requests = signals.mapIndexed { i, signal ->
+            BatchRequest(
+                key = "signal-$i",
+                body = mapOf(
+                    "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
+                    "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to buildPrompt(signal))))),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 900),
+                )
+            )
+        }
+        val responses = batchClient.submitAndAwait(requests, "daybrew-generate")
+        var totalPrompt = 0; var totalCompletion = 0
+        val results = signals.mapIndexed { i, signal ->
+            val resp = responses["signal-$i"]
+            if (resp == null) {
+                log.warn("No batch response for signal: ${signal.title}")
+                GeneratedResult(Idea(title = signal.title, description = signal.body,
+                    sourceTrack = signal.track, sourceUrl = signal.url, rawSignal = signal.body), null)
+            } else {
+                (resp["usageMetadata"] as? Map<*, *>)?.let { u ->
+                    totalPrompt += (u["promptTokenCount"] as? Number)?.toInt() ?: 0
+                    totalCompletion += (u["candidatesTokenCount"] as? Number)?.toInt() ?: 0
+                }
+                runCatching { parseResponse(resp, signal) }.getOrElse {
+                    log.warn("Parse failed for signal: ${signal.title}", it)
+                    GeneratedResult(Idea(title = signal.title, description = signal.body,
+                        sourceTrack = signal.track, sourceUrl = signal.url, rawSignal = signal.body), null)
+                }
+            }
+        }
+        runCatching { adminStatsService.recordGeminiUsage("generate-batch", totalPrompt, totalCompletion) }
+        return results
     }
 
     @Suppress("UNCHECKED_CAST")

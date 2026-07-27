@@ -70,13 +70,19 @@ class PipelineScheduler(
             .let { all -> if (sources != null) all.filter { it.track in sources } else all }
         log.info("Collected ${signals.size} raw signals (pre-filtered by engagement)")
 
-        // generate + embedded score in one API call each
-        val results = signals
-            .filter { signal -> !ideaService.isDuplicate(signal.url, signal.body, signal.track) }
-            .mapNotNull { signal ->
-                runCatching { ideaGenerator.generate(signal) }
-                    .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
-                    .getOrNull()
+        val uniqueSignals = signals.filter { signal ->
+            !ideaService.isDuplicate(signal.url, signal.body, signal.track)
+        }
+        log.info("Unique signals after dedup: ${uniqueSignals.size}")
+
+        val results = runCatching { ideaGenerator.generateBatch(uniqueSignals) }
+            .onFailure { log.warn("Batch generation failed, retrying individually", it) }
+            .getOrElse {
+                uniqueSignals.mapNotNull { signal ->
+                    runCatching { ideaGenerator.generate(signal) }
+                        .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
+                        .getOrNull()
+                }
             }
 
         val savedWithScore = results.map { result ->
