@@ -73,9 +73,8 @@ class AdminStatsServiceTest {
 
     @Test
     fun `getStats returns today and month token totals`() {
-        every { geminiUsageRepository.sumTotalTokensSince(any()) } returnsMany listOf(120L, 5000L)
-        every { geminiUsageRepository.sumPromptTokensSince(any()) } returns 4000L
-        every { geminiUsageRepository.sumCompletionTokensSince(any()) } returns 1000L
+        every { geminiUsageRepository.sumTotalTokensSince(any()) } returns 120L
+        every { geminiUsageRepository.sumTokensSince(any()) } returns TokenTotals(4000L, 1000L, 5000L)
         every { pageViewsRepository.findTop7ByOrderByViewDateDesc() } returns emptyList()
 
         val stats = service.getStats()
@@ -88,8 +87,7 @@ class AdminStatsServiceTest {
     fun `getStats calculates estimated cost using Gemini Flash Lite pricing`() {
         // 2M prompt tokens @ $0.10/1M = $0.20, 500K completion @ $0.40/1M = $0.20 → total $0.40
         every { geminiUsageRepository.sumTotalTokensSince(any()) } returns 0L
-        every { geminiUsageRepository.sumPromptTokensSince(any()) } returns 2_000_000L
-        every { geminiUsageRepository.sumCompletionTokensSince(any()) } returns 500_000L
+        every { geminiUsageRepository.sumTokensSince(any()) } returns TokenTotals(2_000_000L, 500_000L, 2_500_000L)
         every { pageViewsRepository.findTop7ByOrderByViewDateDesc() } returns emptyList()
 
         val stats = service.getStats()
@@ -100,8 +98,7 @@ class AdminStatsServiceTest {
     @Test
     fun `getStats returns zero cost when no usage`() {
         every { geminiUsageRepository.sumTotalTokensSince(any()) } returns 0L
-        every { geminiUsageRepository.sumPromptTokensSince(any()) } returns 0L
-        every { geminiUsageRepository.sumCompletionTokensSince(any()) } returns 0L
+        every { geminiUsageRepository.sumTokensSince(any()) } returns TokenTotals(0L, 0L, 0L)
         every { pageViewsRepository.findTop7ByOrderByViewDateDesc() } returns emptyList()
 
         val stats = service.getStats()
@@ -112,8 +109,7 @@ class AdminStatsServiceTest {
     @Test
     fun `getStats maps page views in chronological order`() {
         every { geminiUsageRepository.sumTotalTokensSince(any()) } returns 0L
-        every { geminiUsageRepository.sumPromptTokensSince(any()) } returns 0L
-        every { geminiUsageRepository.sumCompletionTokensSince(any()) } returns 0L
+        every { geminiUsageRepository.sumTokensSince(any()) } returns TokenTotals(0L, 0L, 0L)
         every { pageViewsRepository.findTop7ByOrderByViewDateDesc() } returns listOf(
             DailyPageViews(viewDate = LocalDate.of(2026, 7, 27), count = 10),
             DailyPageViews(viewDate = LocalDate.of(2026, 7, 26), count = 5),

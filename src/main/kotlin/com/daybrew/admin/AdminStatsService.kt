@@ -39,10 +39,10 @@ class AdminStatsService(
         val todayStart = OffsetDateTime.now().truncatedTo(ChronoUnit.DAYS)
         val monthStart = OffsetDateTime.now().withDayOfMonth(1).truncatedTo(ChronoUnit.DAYS)
 
-        val monthPrompt = geminiUsageRepository.sumPromptTokensSince(monthStart)
-        val monthCompletion = geminiUsageRepository.sumCompletionTokensSince(monthStart)
+        val todayTokens = geminiUsageRepository.sumTotalTokensSince(todayStart)
+        val month = geminiUsageRepository.sumTokensSince(monthStart)
         // Gemini 2.5 Flash Lite: input $0.10/1M, output $0.40/1M
-        val estimatedCost = (monthPrompt * 0.10 + monthCompletion * 0.40) / 1_000_000.0
+        val estimatedCost = (month.promptTokens * 0.10 + month.completionTokens * 0.40) / 1_000_000.0
 
         val pageViews = pageViewsRepository.findTop7ByOrderByViewDateDesc()
             .reversed()
@@ -50,8 +50,8 @@ class AdminStatsService(
 
         return AdminStatsDto(
             gemini = GeminiStatsDto(
-                todayTokens = geminiUsageRepository.sumTotalTokensSince(todayStart),
-                monthTokens = geminiUsageRepository.sumTotalTokensSince(monthStart),
+                todayTokens = todayTokens,
+                monthTokens = month.totalTokens,
                 estimatedMonthlyCostUsd = estimatedCost,
             ),
             pageViews = pageViews,
