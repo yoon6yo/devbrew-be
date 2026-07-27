@@ -54,10 +54,14 @@ class IdeaController(
     fun list(
         @Parameter(description = "아이디어 상태 필터 (PENDING / SCORED / NOTIFIED / REJECTED). 생략 시 전체 조회")
         @RequestParam(required = false) status: IdeaStatus?,
+        @Parameter(description = "다중 상태 필터 (예: statuses=PENDING&statuses=SCORED)")
+        @RequestParam(required = false) statuses: List<IdeaStatus>?,
+        @Parameter(description = "오늘 생성된 아이디어만 필터 (true=오늘, false=이전)")
+        @RequestParam(required = false) today: Boolean?,
         @ParameterObject @PageableDefault(size = 20, sort = ["score"], direction = Sort.Direction.DESC) pageable: Pageable,
     ): Page<IdeaDto> {
         adminStatsService.incrementPageViews()
-        return ideaService.getPage(status, pageable).map { it.toDto() }
+        return ideaService.getPage(status, statuses, today, pageable).map { it.toDto() }
     }
 
     @GetMapping("/{id}")

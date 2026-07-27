@@ -5,7 +5,9 @@ import org.springframework.data.domain.Page
 import org.springframework.data.domain.Pageable
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDate
 import java.time.OffsetDateTime
+import java.time.ZoneId
 
 @Service
 @Transactional(readOnly = true)
@@ -16,9 +18,22 @@ class IdeaService(
 
     fun getAll(): List<Idea> = ideaRepository.findAllOrderedByScore()
 
-    fun getPage(status: IdeaStatus?, pageable: Pageable): Page<Idea> =
-        if (status != null) ideaRepository.findByStatus(status, pageable)
-        else ideaRepository.findAll(pageable)
+    fun getPage(
+        status: IdeaStatus?,
+        statuses: List<IdeaStatus>?,
+        today: Boolean?,
+        pageable: Pageable,
+    ): Page<Idea> {
+        val kst = ZoneId.of("Asia/Seoul")
+        val todayStart = LocalDate.now(kst).atStartOfDay(kst).toOffsetDateTime()
+        return when {
+            !statuses.isNullOrEmpty() -> ideaRepository.findByStatusIn(statuses, pageable)
+            status != null && today == true -> ideaRepository.findByStatusAndCreatedAtGreaterThanEqual(status, todayStart, pageable)
+            status != null && today == false -> ideaRepository.findByStatusAndCreatedAtLessThan(status, todayStart, pageable)
+            status != null -> ideaRepository.findByStatus(status, pageable)
+            else -> ideaRepository.findAll(pageable)
+        }
+    }
 
     fun getById(id: Long): Idea = ideaRepository.findById(id)
         .orElseThrow { NoSuchElementException("Idea not found: $id") }
