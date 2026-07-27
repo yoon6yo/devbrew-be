@@ -167,6 +167,12 @@ class IdeaController(
         return ResponseEntity.ok(ideaService.markNotified(idea.id).toDto())
     }
 
+    @PostMapping("/{id}/restore")
+    @Operation(summary = "거절된 아이디어 복구 (관리자 전용) — REJECTED → SCORED/PENDING")
+    @SecurityRequirement(name = "bearerAuth")
+    fun restore(@PathVariable id: Long): ResponseEntity<IdeaDto> =
+        ResponseEntity.ok(ideaService.restore(id).toDto())
+
     @PostMapping("/{id}/reject")
     @Operation(
         summary = "아이디어 수동 거절 (관리자 전용)",

@@ -82,6 +82,15 @@ class IdeaService(
     }
 
     @Transactional
+    fun restore(id: Long): Idea {
+        val idea = getById(id)
+        require(idea.status == IdeaStatus.REJECTED) { "Only REJECTED ideas can be restored" }
+        idea.status = if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
     fun starIdea(id: Long, fingerprint: String): Pair<Idea, Boolean> {
         require(fingerprint.isNotBlank() && fingerprint.length <= 64) { "Invalid fingerprint" }
         val idea = getById(id)
