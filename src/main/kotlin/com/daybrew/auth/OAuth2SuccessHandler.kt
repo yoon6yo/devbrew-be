@@ -1,9 +1,10 @@
 package com.daybrew.auth
 
 import com.daybrew.config.DayBrewProperties
-import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseCookie
 import org.springframework.security.core.Authentication
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken
 import org.springframework.security.oauth2.core.user.OAuth2User
@@ -50,14 +51,14 @@ class OAuth2SuccessHandler(
         }
 
         val token = jwtTokenProvider.generate(user.id, user.email, user.role)
-        // Deliver JWT via HttpOnly cookie to avoid URL/history/Referer leakage
-        val cookie = Cookie("access_token", token).apply {
-            isHttpOnly = true
-            secure = true
-            path = "/"
-            maxAge = (props.jwt.expirationMs / 1000).toInt()
-        }
-        response.addCookie(cookie)
+        val cookie = ResponseCookie.from("access_token", token)
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(props.jwt.expirationMs / 1000)
+            .sameSite("Lax")
+            .build()
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString())
         response.sendRedirect("${props.frontend.url}/oauth2/callback")
     }
 

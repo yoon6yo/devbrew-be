@@ -47,6 +47,11 @@ class SecurityConfig(
         return http
             .cors { it.configurationSource(corsConfigurationSource()) }
             .csrf { it.disable() }
+            .headers { headers ->
+                headers.referrerPolicy {
+                    it.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
+                }
+            }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
                 auth

@@ -2,9 +2,10 @@ package com.daybrew.auth
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpHeaders
+import org.springframework.http.ResponseCookie
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.Size
@@ -77,13 +78,14 @@ class AuthController(
     @PostMapping("/logout")
     @Operation(summary = "Clear the access_token cookie to log out")
     fun logout(response: HttpServletResponse): ResponseEntity<Void> {
-        val cookie = Cookie("access_token", "").apply {
-            isHttpOnly = true
-            secure = true
-            path = "/"
-            maxAge = 0
-        }
-        response.addCookie(cookie)
+        val cookie = ResponseCookie.from("access_token", "")
+            .httpOnly(true)
+            .secure(true)
+            .path("/")
+            .maxAge(0)
+            .sameSite("Lax")
+            .build()
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString())
         return ResponseEntity.noContent().build()
     }
 }
