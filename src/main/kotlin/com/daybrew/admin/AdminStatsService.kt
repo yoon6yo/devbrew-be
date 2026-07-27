@@ -26,7 +26,13 @@ class AdminStatsService(
     @Async
     @Transactional
     fun incrementPageViews() {
-        pageViewsRepository.upsertIncrement(LocalDate.now())
+        val today = LocalDate.now()
+        val record = pageViewsRepository.findByViewDate(today)
+        if (record != null) {
+            record.count++
+        } else {
+            pageViewsRepository.save(DailyPageViews(viewDate = today, count = 1))
+        }
     }
 
     @Transactional(readOnly = true)
