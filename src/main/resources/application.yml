@@ -93,5 +93,5 @@ daybrew:
       client-secret: ${REDDIT_CLIENT_SECRET:}
     github:
       pat: ${GITHUB_PAT:}
-      min-stars: 100
-      max-stars: 2000
+      abandoned-min-stars: 500
+      abandoned-years: 3
