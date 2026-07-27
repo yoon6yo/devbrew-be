@@ -156,7 +156,7 @@ class GeminiIdeaGeneratorTest {
     }
 
     @Test
-    fun `normalize truncates body at 2000 characters`() {
+    fun `normalize truncates body at 800 characters`() {
         wireMock.stubFor(
             post(urlPathMatching("/v1/models/.*:generateContent"))
                 .willReturn(aResponse()
@@ -169,7 +169,8 @@ class GeminiIdeaGeneratorTest {
 
         wireMock.verify(
             com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor(urlPathMatching("/v1/models/.*:generateContent"))
-                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("a".repeat(2001)))
+                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.containing("a".repeat(800)))
+                .withRequestBody(com.github.tomakehurst.wiremock.client.WireMock.notContaining("a".repeat(801)))
         )
     }
 
