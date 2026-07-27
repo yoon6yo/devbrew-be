@@ -37,6 +37,19 @@ class IdeaControllerTest {
             createdAt = OffsetDateTime.parse("2025-07-01T00:00:00Z"),
         )
 
+    // ── GET /api/ideas/stats ─────────────────────────────────────────────────
+
+    @Test
+    fun `stats returns status count map from service`() {
+        val counts = mapOf("PENDING" to 5L, "SCORED" to 3L, "NOTIFIED" to 2L, "REJECTED" to 1L)
+        every { ideaService.getStatusCounts() } returns counts
+
+        val result = controller.stats()
+
+        assertThat(result).isEqualTo(counts)
+        assertThat(result["PENDING"]).isEqualTo(5L)
+    }
+
     // ── GET /api/ideas ────────────────────────────────────────────────────────
 
     @Test
