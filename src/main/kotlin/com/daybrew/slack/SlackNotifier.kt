@@ -2,6 +2,7 @@ package com.daybrew.slack
 
 import com.daybrew.config.DayBrewProperties
 import com.daybrew.idea.Idea
+import com.daybrew.idea.SourceTrack
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 import org.springframework.web.reactive.function.client.WebClient
@@ -50,11 +51,10 @@ open class SlackNotifier(
     }
 
     private fun buildPayload(idea: Idea): Map<String, Any> {
-        val trackLabel = when (idea.sourceTrack.name) {
-            "SAAS" -> ":bar_chart: SaaS"
-            "GITHUB" -> ":octocat: GitHub"
-            "VIRAL" -> ":fire: Viral"
-            else -> ":bulb: ${idea.sourceTrack.name}"
+        val trackLabel = when (idea.sourceTrack) {
+            SourceTrack.SAAS -> ":bar_chart: SaaS"
+            SourceTrack.GITHUB -> ":octocat: GitHub"
+            SourceTrack.VIRAL -> ":fire: Viral"
         }
 
         val blocks = mutableListOf<Map<String, Any>>(
