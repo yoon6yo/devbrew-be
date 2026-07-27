@@ -54,6 +54,9 @@ class Idea(
     @Column(name = "suggested_stack", columnDefinition = "TEXT")
     var suggestedStack: String? = null,
 
+    @Column(name = "implementation_guide", columnDefinition = "TEXT")
+    var implementationGuide: String? = null,
+
     @Column(name = "star_count", nullable = false)
     var starCount: Int = 0,
 
