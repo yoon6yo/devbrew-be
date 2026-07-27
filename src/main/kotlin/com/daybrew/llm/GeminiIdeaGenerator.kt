@@ -21,7 +21,7 @@ class GeminiIdeaGenerator(
     private val log = LoggerFactory.getLogger(javaClass)
 
     override fun generate(signal: RawSignal): Idea {
-        val uri = "${props.gemini.baseUrl}/v1beta/models/${props.gemini.model}:generateContent"
+        val uri = "${props.gemini.baseUrl}/v1/models/${props.gemini.model}:generateContent"
 
         @Suppress("UNCHECKED_CAST")
         val response = webClient.post()
