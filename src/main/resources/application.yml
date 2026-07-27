@@ -89,8 +89,6 @@ daybrew:
       subreddits: SaaS,entrepreneur,startups
       viral-subreddits: InternetIsBeautiful,SideProject,webdev
       user-agent: daybrew/1.0 (idea-curator)
-      client-id: ${REDDIT_CLIENT_ID:}
-      client-secret: ${REDDIT_CLIENT_SECRET:}
     github:
       pat: ${GITHUB_PAT:}
       abandoned-min-stars: 500

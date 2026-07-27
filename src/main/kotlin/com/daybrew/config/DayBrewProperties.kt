@@ -39,9 +39,6 @@ data class DayBrewProperties(
     data class PipelineProps(
         val reddit: RedditProps = RedditProps(),
     ) {
-        data class RedditProps(
-            val clientId: String = "",
-            val clientSecret: String = "",
-        )
+        data class RedditProps()
     }
 }
