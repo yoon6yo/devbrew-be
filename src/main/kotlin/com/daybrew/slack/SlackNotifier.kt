@@ -55,6 +55,7 @@ open class SlackNotifier(
             SourceTrack.SAAS -> ":bar_chart: SaaS"
             SourceTrack.GITHUB -> ":octocat: GitHub"
             SourceTrack.VIRAL -> ":fire: Viral"
+            SourceTrack.HACKERNEWS -> ":orange_book: HN"
         }
 
         val blocks = mutableListOf<Map<String, Any>>(
