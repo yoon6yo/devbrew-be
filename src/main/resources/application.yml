@@ -88,6 +88,8 @@ daybrew:
     reddit:
       subreddits: SaaS,entrepreneur,startups,webdev,programming
       user-agent: daybrew/1.0 (idea-curator)
+      client-id: ${REDDIT_CLIENT_ID:}
+      client-secret: ${REDDIT_CLIENT_SECRET:}
     github:
       pat: ${GITHUB_PAT:}
       min-stars: 100

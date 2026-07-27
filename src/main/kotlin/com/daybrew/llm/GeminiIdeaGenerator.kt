@@ -77,9 +77,27 @@ class GeminiIdeaGenerator(
     }
 
     private fun systemInstruction(track: SourceTrack): String = when (track) {
-        SourceTrack.SAAS -> "You are a startup idea generator. Extract and refine a clear SaaS product idea from the given signal. Focus on the core value proposition and target market."
-        SourceTrack.GITHUB -> "You are a tech trend analyst. Identify the underlying technology trend and the product opportunity behind this GitHub signal."
-        SourceTrack.VIRAL -> "You are a viral product designer. Identify what makes this concept appealing and suggest a concrete consumer product idea."
+        SourceTrack.SAAS -> """You are a senior product strategist and startup advisor with 15 years of experience building and investing in B2B SaaS companies.
+Your job is to extract the sharpest possible startup idea from a given market signal.
+Rules:
+- The idea must be specific, not generic. Name the exact target customer (e.g. "indie hackers running solo SaaS" not "businesses").
+- The problem must be a real pain, not a nice-to-have.
+- The description must be concrete enough that a developer could start building tomorrow.
+- Write in a confident, direct tone. No corporate jargon."""
+        SourceTrack.GITHUB -> """You are a veteran developer-turned-product manager who spots product opportunities hidden in open-source trends.
+Your job is to look at a GitHub project or trend and extract the product gap it reveals — what would non-developers pay for if this technology were productized?
+Rules:
+- Identify who is underserved by the current open-source tooling.
+- The product idea must add real value on top of, or around, the raw technology.
+- Focus on distribution: who would buy this and how would they find it?
+- Be specific about the integration points and automation opportunities."""
+        SourceTrack.VIRAL -> """You are a consumer product designer who has launched three apps with over 1M downloads each.
+Your job is to take a viral concept or trend and design a concrete, buildable consumer product around it.
+Rules:
+- The product must tap into a genuine human emotion or social behavior.
+- Name the exact moment in someone's day when they would use this.
+- The hook (why people share it) must be built into the core experience.
+- Suggest a specific viral loop or growth mechanic."""
     }
 
     private fun normalize(text: String): String = text
@@ -92,17 +110,23 @@ class GeminiIdeaGenerator(
     private fun buildPrompt(signal: RawSignal): String {
         val title = normalize(signal.title)
         val body = normalize(signal.body)
-        return """Signal: $title
+        return """## Market Signal
 
-$body
+Title: $title
 
-Generate a startup idea. Respond with JSON only:
+Context: $body
+
+## Your Task
+
+Analyze this signal deeply and generate a sharp, actionable startup idea. Be specific — avoid vague generalities.
+
+Respond with JSON only (no markdown, no explanation outside the JSON):
 {
-  "title": "concise product name",
-  "description": "1-2 sentence overview of the product",
-  "purpose": "사용 목적 — what specific problem this solves and who experiences it (2-3 sentences)",
-  "howItWorks": "어떻게 동작하나요 — step-by-step explanation of how the product works (2-4 steps, each on a new line starting with a number)",
-  "suggestedStack": "recommended tech stack and key libraries (concise list)"
+  "title": "Short, memorable product name (2-4 words, no generic words like 'Pro' or 'AI')",
+  "description": "3-4 sentence pitch. Lead with the specific problem, then the solution, then why now. Write like you're pitching to a skeptical investor.",
+  "purpose": "정확히 누가, 어떤 상황에서, 어떤 고통을 겪는지 — 한국어로 구체적으로 서술. 막연한 표현 금지. 실제 사용자 시나리오로 설명 (3-4문장).",
+  "howItWorks": "어떻게 동작하나요 — 사용자 관점에서 단계별로 설명. 각 단계는 번호로 시작. 핵심 기술/자동화 포인트를 명시. 최소 4단계.",
+  "suggestedStack": "구체적인 기술 스택: 프론트엔드, 백엔드, DB, 핵심 라이브러리/API를 각각 명시. 이유도 한 줄씩."
 }"""
     }
 }

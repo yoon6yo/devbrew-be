@@ -107,6 +107,18 @@ spec:
                   name: daybrew-secrets
                   key: kakao-client-secret
                   optional: true
+            - name: REDDIT_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: reddit-client-id
+                  optional: true
+            - name: REDDIT_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: daybrew-secrets
+                  key: reddit-client-secret
+                  optional: true
           resources:
             requests:
               memory: "384Mi"
