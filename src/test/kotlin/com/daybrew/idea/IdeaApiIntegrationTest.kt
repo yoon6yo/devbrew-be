@@ -199,4 +199,13 @@ class IdeaApiIntegrationTest {
         mvc.perform(get("/actuator/health"))
             .andExpect(status().isOk)
     }
+
+    // ── Logout ────────────────────────────────────────────────────────────────
+
+    @Test
+    fun `POST logout returns 204 and expires access_token cookie`() {
+        mvc.perform(post("/api/auth/logout"))
+            .andExpect(status().isNoContent)
+            .andExpect(cookie().maxAge("access_token", 0))
+    }
 }
