@@ -1,5 +1,6 @@
 package com.daybrew.idea
 
+import com.daybrew.admin.AdminStatsService
 import com.daybrew.config.resolveClientIp
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.Parameter
@@ -27,7 +28,7 @@ import org.springframework.web.bind.annotation.*
 @Tag(name = "Ideas", description = "아이디어 조회 및 관리")
 class IdeaController(
     private val ideaService: IdeaService,
-    private val adminStatsService: com.daybrew.admin.AdminStatsService,
+    private val adminStatsService: AdminStatsService,
     private val starRateLimiter: StarRateLimiter,
 ) {
 
