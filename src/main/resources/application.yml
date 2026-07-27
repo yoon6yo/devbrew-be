@@ -52,6 +52,13 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
 
 logging:
   level:

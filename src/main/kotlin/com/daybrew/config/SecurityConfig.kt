@@ -62,7 +62,7 @@ class SecurityConfig(
                         "/swagger-ui.html",
                         "/v3/api-docs/**",
                     ).permitAll()
-                    .requestMatchers("/actuator/health").permitAll()
+                    .requestMatchers("/actuator/health/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/ideas", "/api/ideas/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/ideas/*/star").permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/ideas/*/star").permitAll()
