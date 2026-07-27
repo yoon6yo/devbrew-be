@@ -2,7 +2,9 @@ package com.daybrew.auth
 
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
+import jakarta.servlet.http.Cookie
 import jakarta.servlet.http.HttpServletRequest
+import jakarta.servlet.http.HttpServletResponse
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.Size
@@ -70,6 +72,19 @@ class AuthController(
         val email = auth.name
         val role = auth.authorities.firstOrNull()?.authority?.removePrefix("ROLE_") ?: "USER"
         return ResponseEntity.ok(MeResponse(email = email, role = role))
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Clear the access_token cookie to log out")
+    fun logout(response: HttpServletResponse): ResponseEntity<Void> {
+        val cookie = Cookie("access_token", "").apply {
+            isHttpOnly = true
+            secure = true
+            path = "/"
+            maxAge = 0
+        }
+        response.addCookie(cookie)
+        return ResponseEntity.noContent().build()
     }
 }
 
