@@ -24,6 +24,11 @@ data class IdeaDto(
     @Schema(description = "어떻게 동작하나요 — 단계별 동작 방식") val howItWorks: String?,
     @Schema(description = "추천 기술 스택") val suggestedStack: String?,
     @Schema(description = "구현 방법 가이드") val implementationGuide: String?,
+    @Schema(description = "한 줄 서비스 요약") val oneLiner: String?,
+    @Schema(description = "해결하는 문제 목록 (줄바꿈 구분)") val problems: String?,
+    @Schema(description = "수익 모델 및 예상 가격대") val revenueModel: String?,
+    @Schema(description = "핵심 장점 목록 (줄바꿈 구분)") val strengths: String?,
+    @Schema(description = "핵심 리스크 목록 (줄바꿈 구분)") val risks: String?,
 )
 
 fun Idea.toDto() = IdeaDto(
@@ -46,4 +51,9 @@ fun Idea.toDto() = IdeaDto(
     howItWorks = howItWorks,
     suggestedStack = suggestedStack,
     implementationGuide = implementationGuide,
+    oneLiner = oneLiner,
+    problems = problems,
+    revenueModel = revenueModel,
+    strengths = strengths,
+    risks = risks,
 )

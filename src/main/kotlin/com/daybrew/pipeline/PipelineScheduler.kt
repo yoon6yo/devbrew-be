@@ -4,14 +4,17 @@ import com.daybrew.idea.IdeaRepository
 import com.daybrew.idea.IdeaService
 import com.daybrew.idea.IdeaStatus
 import com.daybrew.idea.SourceTrack
+import com.daybrew.llm.GeneratedResult
 import com.daybrew.llm.IdeaGenerator
 import com.daybrew.llm.IdeaRater
 import com.daybrew.pipeline.collector.IdeaCollector
+import com.daybrew.pipeline.collector.RawSignal
 import com.daybrew.slack.SlackNotifier
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
+import java.time.OffsetDateTime
 
 @Component
 class PipelineScheduler(
@@ -26,12 +29,17 @@ class PipelineScheduler(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    // Run daily at 09:00 KST (00:00 UTC)
+    // Collect + generate at 09:00 KST (00:00 UTC)
     @Async
     @Scheduled(cron = "0 0 0 * * *")
-    fun runPipeline() = runPipeline(sources = null)
+    fun scheduledCollect() = runCollect(sources = null)
 
-    // Publish top scored ideas daily at midnight KST (15:00 UTC): SCORED → NOTIFIED
+    // Score all PENDING at 09:30 KST (00:30 UTC) — runs after collect completes
+    @Async
+    @Scheduled(cron = "0 30 0 * * *")
+    fun scheduledScore() = runScore()
+
+    // Publish top scored ideas at midnight KST (15:00 UTC): SCORED → NOTIFIED → FEATURED
     @Async
     @Scheduled(cron = "0 0 15 * * *")
     fun publishTopIdeas() {
@@ -53,96 +61,192 @@ class PipelineScheduler(
             log.info("Publish job complete — notified ${top.size} ideas")
         }
 
-        // NOTIFIED → FEATURED: select today's top 6 for main page
         val featured = runCatching { ideaService.selectDailyTopFeatured() }
             .onFailure { log.warn("Feature selection failed", it) }
             .getOrDefault(emptyList())
         log.info("Feature job complete — featured ${featured.size} ideas")
     }
 
-    // Hard-delete REJECTED ideas older than 1 year — runs nightly at 03:30 UTC (12:30 KST)
+    // Hard-delete REJECTED ideas older than 1 year — 03:30 UTC (12:30 KST)
     @Async
     @Scheduled(cron = "0 30 3 * * *")
     fun hardDeleteRejected() {
-        val cutoff = java.time.OffsetDateTime.now().minusYears(1)
+        val cutoff = OffsetDateTime.now().minusYears(1)
         val deleted = ideaRepository.deleteByStatusAndUpdatedAtBefore(IdeaStatus.REJECTED, cutoff)
         log.info("Hard-delete job: removed $deleted REJECTED ideas older than 1 year")
     }
 
+    // ── Manual triggers ──────────────────────────────────────────────────────
+
+    /** Full pipeline (collect + score) for backward compat with existing /trigger endpoint */
     @Async
     fun triggerAsync(sources: Set<SourceTrack>?) = runPipeline(sources)
 
-    fun runPipeline(sources: Set<SourceTrack>?) {
-        statusTracker.start()
+    @Async
+    fun triggerCollectAsync(sources: Set<SourceTrack>?) = runCollect(sources)
+
+    @Async
+    fun triggerScoreAsync() = runScore()
+
+    // ── Public step runners ──────────────────────────────────────────────────
+
+    fun runCollect(sources: Set<SourceTrack>?) {
+        if (!statusTracker.start(totalSteps = 3)) {
+            log.warn("Pipeline already running — skipping collect trigger (sources={})", sources ?: "ALL")
+            return
+        }
         try {
-            log.info("Pipeline started — sources={}", sources ?: "ALL")
+            val saved = executeCollect(sources)
+            statusTracker.finish(result = if (saved > 0) "신규 ${saved}개 생성 — 채점 대기중" else "신규 아이디어 없음")
+        } catch (e: Exception) {
+            log.error("Collect step failed", e)
+            statusTracker.finish(error = e.message ?: "알 수 없는 오류")
+        }
+    }
 
-            statusTracker.update("신호 수집", 1, "소스에서 신호 수집 중…")
-            val signals = collectors.flatMap { it.collect() }
-                .let { all -> if (sources != null) all.filter { it.track in sources } else all }
-            log.info("Collected ${signals.size} raw signals (pre-filtered by engagement)")
+    fun runScore() {
+        if (!statusTracker.start(totalSteps = 1)) {
+            log.warn("Pipeline already running — skipping score trigger")
+            return
+        }
+        try {
+            val scored = executeScore()
+            statusTracker.finish(result = if (scored > 0) "채점 완료 ${scored}개" else "채점할 아이디어 없음")
+        } catch (e: Exception) {
+            log.error("Score step failed", e)
+            statusTracker.finish(error = e.message ?: "알 수 없는 오류")
+        }
+    }
 
-            statusTracker.update("중복 제거", 2, "${signals.size}개 신호 중복 제거 중…")
-            val uniqueSignals = signals.filter { signal ->
-                !ideaService.isDuplicate(signal.url, signal.body, signal.track)
-            }
-            log.info("Unique signals after dedup: ${uniqueSignals.size}")
-
-            statusTracker.update("아이디어 생성", 3, "${uniqueSignals.size}개 신호 → Gemini 생성 중…")
-            val results = runCatching { ideaGenerator.generateBatch(uniqueSignals) }
-                .onFailure { log.warn("Batch generation failed, retrying individually", it) }
-                .getOrElse {
-                    uniqueSignals.mapNotNull { signal ->
-                        runCatching { ideaGenerator.generate(signal) }
-                            .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
-                            .getOrNull()
-                    }
-                }
-
-            val savedWithScore = results.map { result ->
-                val saved = ideaService.save(result.idea)
-                saved to result.score
-            }
-            log.info("Saved ${savedWithScore.size} new ideas")
-
-            if (savedWithScore.isEmpty()) {
+    fun runPipeline(sources: Set<SourceTrack>?) {
+        if (!statusTracker.start(totalSteps = 4)) {
+            log.warn("Pipeline already running — skipping trigger (sources={})", sources ?: "ALL")
+            return
+        }
+        try {
+            val saved = executeCollect(sources)
+            if (saved == 0) {
                 statusTracker.finish(result = "신규 아이디어 없음")
-                log.info("Pipeline complete — no new ideas")
                 return
             }
-
-            statusTracker.update("채점", 4, "${savedWithScore.size}개 아이디어 채점 중…")
-            val needsRating = mutableListOf<com.daybrew.idea.Idea>()
-            var scoredCount = 0
-
-            savedWithScore.forEach { (idea, score) ->
-                if (score != null) {
-                    runCatching { ideaService.updateScore(idea.id, score) }
-                        .onSuccess { scoredCount++ }
-                        .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
-                } else {
-                    needsRating += idea
-                }
-            }
-
-            if (needsRating.isNotEmpty()) {
-                log.info("Fallback rating for ${needsRating.size} ideas without embedded score")
-                val ratings = runCatching { ideaRater.rateAll(needsRating) }
-                    .onFailure { log.warn("Fallback batch rating failed", it) }
-                    .getOrDefault(emptyMap())
-                needsRating.forEach { idea ->
-                    val result = ratings[idea.id] ?: return@forEach
-                    runCatching { ideaService.updateScore(idea.id, result) }
-                        .onSuccess { scoredCount++ }
-                        .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
-                }
-            }
-
-            statusTracker.finish(result = "신규 ${savedWithScore.size}개, 채점 ${scoredCount}개")
-            log.info("Pipeline complete — scored=$scoredCount, fallback=${needsRating.size}")
+            val scored = executeScore()
+            statusTracker.finish(result = "신규 ${saved}개, 채점 ${scored}개")
         } catch (e: Exception) {
             log.error("Pipeline failed", e)
             statusTracker.finish(error = e.message ?: "알 수 없는 오류")
         }
+    }
+
+    // ── Private step implementations ─────────────────────────────────────────
+
+    private fun executeCollect(sources: Set<SourceTrack>?): Int {
+        log.info("Collect started — sources={}", sources ?: "ALL")
+
+        statusTracker.update("신호 수집", 1, "소스 ${collectors.size}개 수집 시작…")
+        val allSignals = mutableListOf<RawSignal>()
+        collectors.forEach { collector ->
+            val name = collector.javaClass.simpleName.removeSuffix("Collector")
+            runCatching { collector.collect() }
+                .onSuccess { fetched ->
+                    allSignals += fetched
+                    statusTracker.update("신호 수집", 1, "$name ${fetched.size}개 → 누적 ${allSignals.size}개")
+                    log.info("$name: collected ${fetched.size} signals")
+                }
+                .onFailure { e ->
+                    log.warn("Collector $name failed", e)
+                    statusTracker.update("신호 수집", 1, "$name 실패 — 누적 ${allSignals.size}개")
+                }
+        }
+        val signals = allSignals
+            .let { all -> if (sources != null) all.filter { it.track in sources } else all }
+        log.info("Collected ${signals.size} raw signals")
+
+        statusTracker.update("중복 제거", 2, "${signals.size}개 신호 중복 제거 중…")
+        val uniqueSignals = signals.filter { signal ->
+            !ideaService.isDuplicate(signal.url, signal.body, signal.track)
+        }
+        log.info("Unique signals after URL/body dedup: ${uniqueSignals.size}")
+
+        if (uniqueSignals.isEmpty()) {
+            log.info("No unique signals — collect complete with 0 new ideas")
+            return 0
+        }
+
+        statusTracker.update("아이디어 생성", 3, "${uniqueSignals.size}개 신호 → Gemini 생성 중…")
+        val results = runCatching { ideaGenerator.generateBatch(uniqueSignals) }
+            .onFailure { log.warn("Batch generation failed, retrying individually", it) }
+            .getOrElse {
+                uniqueSignals.mapNotNull { signal ->
+                    runCatching { ideaGenerator.generate(signal) }
+                        .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
+                        .getOrNull()
+                }
+            }
+
+        val recentTitles = ideaRepository.findTitlesByCreatedAtAfter(OffsetDateTime.now().minusDays(90))
+        val conceptDeduped = deduplicateByTitle(results, recentTitles)
+        log.info("Concept dedup: ${conceptDeduped.size}/${results.size} kept")
+
+        var savedCount = 0
+        conceptDeduped.forEach { result ->
+            runCatching { ideaService.save(result.idea) }
+                .onSuccess { savedCount++ }
+                .onFailure { log.warn("Save failed for idea: ${result.idea.title}", it) }
+        }
+        log.info("Saved $savedCount new PENDING ideas")
+        return savedCount
+    }
+
+    private fun executeScore(): Int {
+        val pending = ideaService.getPending()
+        log.info("Score started — ${pending.size} PENDING ideas")
+        if (pending.isEmpty()) return 0
+
+        statusTracker.update("채점", 1, "${pending.size}개 아이디어 채점 중…")
+        val ratings = runCatching { ideaRater.rateAll(pending) }
+            .onFailure { log.warn("Batch rating failed", it) }
+            .getOrDefault(emptyMap())
+
+        var scoredCount = 0
+        pending.forEach { idea ->
+            val result = ratings[idea.id] ?: return@forEach
+            runCatching { ideaService.updateScore(idea.id, result) }
+                .onSuccess { scoredCount++ }
+                .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+        }
+        log.info("Scored $scoredCount/${pending.size} ideas")
+        return scoredCount
+    }
+
+    // ── Concept dedup ─────────────────────────────────────────────────────────
+
+    private fun titleJaccard(a: String, b: String): Double {
+        val re = Regex("[\\s·,.!?()\\[\\]/]+")
+        val tokA = a.lowercase().split(re).filter { it.length >= 2 }.toSet()
+        val tokB = b.lowercase().split(re).filter { it.length >= 2 }.toSet()
+        if (tokA.isEmpty() || tokB.isEmpty()) return 0.0
+        val inter = tokA.intersect(tokB).size.toDouble()
+        return inter / tokA.union(tokB).size.toDouble()
+    }
+
+    private fun deduplicateByTitle(
+        results: List<GeneratedResult>,
+        existingTitles: List<String>,
+        threshold: Double = 0.45,
+    ): List<GeneratedResult> {
+        val kept = mutableListOf<GeneratedResult>()
+        val keptTitles = mutableListOf<String>()
+        for (result in results) {
+            val title = result.idea.title
+            val isDup = existingTitles.any { titleJaccard(it, title) >= threshold }
+                || keptTitles.any { titleJaccard(it, title) >= threshold }
+            if (isDup) {
+                log.info("Concept duplicate skipped: \"$title\"")
+            } else {
+                kept += result
+                keptTitles += title
+            }
+        }
+        return kept
     }
 }

@@ -183,6 +183,87 @@ class IdeaServiceTest {
         assertThat(result.keys).containsExactlyInAnyOrderElementsOf(IdeaStatus.entries.map { it.name })
     }
 
+    // ── restore ──────────────────────────────────────────────────────────────
+
+    @Test
+    fun `restore transitions FEATURED to NOTIFIED`() {
+        val idea = idea(1L, IdeaStatus.FEATURED)
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+        every { ideaRepository.save(any()) } answers { firstArg() }
+
+        val result = service.restore(1L)
+
+        assertThat(result.status).isEqualTo(IdeaStatus.NOTIFIED)
+    }
+
+    @Test
+    fun `restore transitions NOTIFIED to SCORED`() {
+        val idea = idea(1L, IdeaStatus.NOTIFIED, score = 7)
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+        every { ideaRepository.save(any()) } answers { firstArg() }
+
+        val result = service.restore(1L)
+
+        assertThat(result.status).isEqualTo(IdeaStatus.SCORED)
+    }
+
+    @Test
+    fun `restore transitions SCORED to PENDING and clears all score fields`() {
+        val idea = idea(1L, IdeaStatus.SCORED, score = 8)
+        idea.scoreMarketFit = 8
+        idea.scoreNovelty = 7
+        idea.scoreFeasibility = 9
+        idea.scoreMonetization = 6
+        idea.scoreTrend = 8
+        idea.scoreReason = "Solid market fit"
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+        every { ideaRepository.save(any()) } answers { firstArg() }
+
+        val result = service.restore(1L)
+
+        assertThat(result.status).isEqualTo(IdeaStatus.PENDING)
+        assertThat(result.score).isNull()
+        assertThat(result.scoreMarketFit).isNull()
+        assertThat(result.scoreNovelty).isNull()
+        assertThat(result.scoreFeasibility).isNull()
+        assertThat(result.scoreMonetization).isNull()
+        assertThat(result.scoreTrend).isNull()
+        assertThat(result.scoreReason).isNull()
+    }
+
+    @Test
+    fun `restore transitions REJECTED with score to SCORED`() {
+        val idea = idea(1L, IdeaStatus.REJECTED, score = 6)
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+        every { ideaRepository.save(any()) } answers { firstArg() }
+
+        val result = service.restore(1L)
+
+        assertThat(result.status).isEqualTo(IdeaStatus.SCORED)
+    }
+
+    @Test
+    fun `restore transitions REJECTED without score to PENDING and clears score fields`() {
+        val idea = idea(1L, IdeaStatus.REJECTED)
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+        every { ideaRepository.save(any()) } answers { firstArg() }
+
+        val result = service.restore(1L)
+
+        assertThat(result.status).isEqualTo(IdeaStatus.PENDING)
+        assertThat(result.score).isNull()
+        assertThat(result.scoreReason).isNull()
+    }
+
+    @Test
+    fun `restore throws when idea is already PENDING`() {
+        val idea = idea(1L, IdeaStatus.PENDING)
+        every { ideaRepository.findById(1L) } returns Optional.of(idea)
+
+        assertThatThrownBy { service.restore(1L) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+    }
+
     // ── getPage ──────────────────────────────────────────────────────────────
 
     @Test

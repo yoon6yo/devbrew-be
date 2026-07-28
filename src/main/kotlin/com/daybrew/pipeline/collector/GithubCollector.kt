@@ -37,14 +37,15 @@ class GithubCollector(
         val today = LocalDate.now()
         val cutoffDate = today.minusYears(abandonedYears).toString()
         val deepCutoffDate = today.minusYears(abandonedYears + 2).toString()
-        val mediumStarMax = (minStars - 1).coerceAtLeast(100)
+        val mediumStarMax = minStars - 1
 
-        // Three query variants to get diverse repos on each run instead of always the same top list
-        val variants = listOf(
-            Triple("stars:>$minStars+pushed:<$cutoffDate+archived:false+fork:false", "stars", "desc"),
-            Triple("stars:50..$mediumStarMax+pushed:<$cutoffDate+archived:false+fork:false", "stars", "desc"),
-            Triple("stars:>$minStars+pushed:<$deepCutoffDate+archived:false+fork:false", "updated", "desc"),
-        )
+        val variants = buildList {
+            add(Triple("stars:>$minStars pushed:<$cutoffDate archived:false fork:false", "stars", "desc"))
+            if (mediumStarMax >= 50) {
+                add(Triple("stars:50..$mediumStarMax pushed:<$cutoffDate archived:false fork:false", "stars", "desc"))
+            }
+            add(Triple("stars:>$minStars pushed:<$deepCutoffDate archived:false fork:false", "updated", "desc"))
+        }
 
         return variants.flatMap { (query, sort, order) ->
             fetchRepos(query, sort, order)
@@ -55,7 +56,12 @@ class GithubCollector(
     private fun fetchRepos(query: String, sort: String, order: String): List<RawSignal> {
         return try {
             val response = client.get()
-                .uri("/search/repositories?q=$query&sort=$sort&order=$order&per_page=20")
+                .uri { ub -> ub.path("/search/repositories")
+                    .queryParam("q", query)
+                    .queryParam("sort", sort)
+                    .queryParam("order", order)
+                    .queryParam("per_page", "20")
+                    .build() }
                 .retrieve()
                 .bodyToMono<Map<String, Any>>()
                 .block() ?: return emptyList()

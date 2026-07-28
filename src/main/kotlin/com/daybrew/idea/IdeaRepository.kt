@@ -34,4 +34,7 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
     fun countAllGroupedByStatus(): List<StatusCount>
 
     fun deleteByStatusAndUpdatedAtBefore(status: IdeaStatus, cutoff: java.time.OffsetDateTime): Int
+
+    @Query("SELECT i.title FROM Idea i WHERE i.createdAt > :from")
+    fun findTitlesByCreatedAtAfter(from: java.time.OffsetDateTime): List<String>
 }

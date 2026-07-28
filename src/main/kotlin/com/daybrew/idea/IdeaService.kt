@@ -91,11 +91,12 @@ class IdeaService(
             IdeaStatus.FEATURED, todayStart,
             org.springframework.data.domain.PageRequest.of(0, 10),
         ).content
-        if (alreadyFeaturedToday.size >= 6) return alreadyFeaturedToday
+        val remaining = 6 - alreadyFeaturedToday.size
+        if (remaining <= 0) return alreadyFeaturedToday
 
         val candidates = ideaRepository.findByStatus(IdeaStatus.NOTIFIED)
             .sortedByDescending { it.score ?: 0 }
-            .take(6)
+            .take(remaining)
 
         return candidates.map { markFeatured(it.id) }
     }
@@ -119,6 +120,15 @@ class IdeaService(
             IdeaStatus.NOTIFIED  -> IdeaStatus.SCORED
             IdeaStatus.SCORED    -> IdeaStatus.PENDING
             else                 -> if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
+        }
+        if (idea.status == IdeaStatus.PENDING) {
+            idea.score = null
+            idea.scoreMarketFit = null
+            idea.scoreNovelty = null
+            idea.scoreFeasibility = null
+            idea.scoreMonetization = null
+            idea.scoreTrend = null
+            idea.scoreReason = null
         }
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)

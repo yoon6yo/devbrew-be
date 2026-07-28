@@ -32,7 +32,7 @@ class GeminiIdeaGenerator(
                 mapOf(
                     "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
                     "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to buildPrompt(signal))))),
-                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 900),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 1300),
                 )
             )
             .retrieve()
@@ -56,7 +56,7 @@ class GeminiIdeaGenerator(
                 body = mapOf(
                     "system_instruction" to mapOf("parts" to listOf(mapOf("text" to systemInstruction(signal.track)))),
                     "contents" to listOf(mapOf("parts" to listOf(mapOf("text" to buildPrompt(signal))))),
-                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 900),
+                    "generationConfig" to mapOf("responseMimeType" to "application/json", "maxOutputTokens" to 1300),
                 )
             )
         }
@@ -95,6 +95,11 @@ class GeminiIdeaGenerator(
             val idea = Idea(
                 title = parsed["title"] as String,
                 description = parsed["description"] as String,
+                oneLiner = parsed["oneLiner"] as? String,
+                problems = parsed["problems"] as? String,
+                revenueModel = parsed["revenueModel"] as? String,
+                strengths = parsed["strengths"] as? String,
+                risks = parsed["risks"] as? String,
                 purpose = parsed["purpose"] as? String,
                 howItWorks = parsed["howItWorks"] as? String,
                 suggestedStack = parsed["suggestedStack"] as? String,
@@ -160,9 +165,14 @@ class GeminiIdeaGenerator(
 JSON만 응답 (마크다운 금지). 아이디어 생성 후 즉시 채점하라. 모든 텍스트 필드 한국어:
 {
   "title": "'누가+무엇을+어떻게' 설명형 제목. 브랜드명 금지. 20자 이내.",
+  "oneLiner": "서비스를 한 문장으로. '누가·무엇을·어떻게' 구조. 30자 이내.",
+  "problems": "사용자가 겪는 핵심 문제 3개. 줄바꿈으로 구분. 각 15자 이내. 예: '국가별 상세페이지 재작성 필요\\n외주 번역·디자인 비용 과다\\n신제품 출시 주기 지연'",
   "description": "2-3문장 핵심 피치. 문제→해결책→지금 해야 하는 이유 순서. purpose와 겹치지 않게 제품 가치 중심.",
-  "purpose": "description과 다른 내용. 타겟 사용자가 일상에서 겪는 구체적 고통 시나리오. 2-3문장.",
+  "purpose": "타겟 사용자가 일상에서 겪는 구체적 고통 시나리오. 2-3문장.",
   "howItWorks": "4단계 사용 흐름. 형식: '① 단계\\n② 단계\\n③ 단계\\n④ 단계'. 각 단계 30자 이내.",
+  "revenueModel": "핵심 수익 모델과 예상 가격대. 30자 이내. 예: '월 구독(49,000원~)'",
+  "strengths": "핵심 장점 2-3개. 줄바꿈으로 구분. 각 15자 이내. 예: '시장성 높음\\nAI 트렌드 적합'",
+  "risks": "핵심 리스크 2개. 줄바꿈으로 구분. 각 15자 이내. 예: '경쟁 서비스 많음\\n차별화 필요'",
   "suggestedStack": "핵심 기술명만 콤마 구분. 예: 'React, FastAPI, PostgreSQL'",
   "implementationGuide": "3개 핵심 구현 기술. 형식: '1. 기술명\n- 사용 목적: 1문장\n- 구현: 1-2문장\n2. ...\n3. ...'",
   "score": {

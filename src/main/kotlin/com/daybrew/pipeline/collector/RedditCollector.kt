@@ -23,10 +23,22 @@ class RedditCollector(
         .defaultHeader("User-Agent", userAgent)
         .build()
 
-    override fun collect(): List<RawSignal> =
-        subreddits.flatMap { collectSubreddit(it) + collectSubredditNew(it) } +
-        viralSubreddits.flatMap { collectViralSubreddit(it) } +
-        collectPainPoints()
+    override fun collect(): List<RawSignal> {
+        val results = mutableListOf<RawSignal>()
+        subreddits.forEachIndexed { i, sub ->
+            if (i > 0) Thread.sleep(1_000)
+            results += collectSubreddit(sub)
+            Thread.sleep(1_000)
+            results += collectSubredditNew(sub)
+        }
+        viralSubreddits.forEach { sub ->
+            Thread.sleep(1_000)
+            results += collectViralSubreddit(sub)
+        }
+        if (results.isNotEmpty()) Thread.sleep(1_000)
+        results += collectPainPoints()
+        return results
+    }
 
     private val painPointQueries = listOf(
         "\"I wish there was an app\"",
@@ -38,18 +50,19 @@ class RedditCollector(
     )
 
     private fun collectPainPoints(): List<RawSignal> {
-        return painPointQueries.flatMap { query ->
+        return painPointQueries.flatMapIndexed { i, query ->
+            if (i > 0) Thread.sleep(1_000)
             try {
-                val encoded = java.net.URLEncoder.encode(query, "UTF-8")
+                val encoded = java.net.URLEncoder.encode(query, Charsets.UTF_8)
                 @Suppress("UNCHECKED_CAST")
                 val response = client.get()
                     .uri("/search.json?q=$encoded&sort=relevance&t=week&limit=10&type=link")
                     .retrieve()
                     .bodyToMono<Map<String, Any>>()
-                    .block() ?: return@flatMap emptyList()
+                    .block() ?: return@flatMapIndexed emptyList()
 
                 val children = ((response["data"] as? Map<*, *>)?.get("children") as? List<*>)
-                    ?: return@flatMap emptyList()
+                    ?: return@flatMapIndexed emptyList()
 
                 children.mapNotNull { child ->
                     @Suppress("UNCHECKED_CAST")

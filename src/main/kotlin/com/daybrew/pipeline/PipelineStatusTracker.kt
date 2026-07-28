@@ -46,8 +46,13 @@ class PipelineStatusTracker {
         )
     }
 
-    fun start() {
-        ref.set(Snapshot(running = true, startedAt = OffsetDateTime.now()))
+    fun start(totalSteps: Int = 4): Boolean {
+        val fresh = Snapshot(running = true, startedAt = OffsetDateTime.now(), totalSteps = totalSteps)
+        while (true) {
+            val current = ref.get()
+            if (current.running) return false
+            if (ref.compareAndSet(current, fresh)) return true
+        }
     }
 
     fun update(step: String, stepIndex: Int, detail: String? = null) {

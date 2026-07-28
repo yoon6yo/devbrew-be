@@ -57,6 +57,21 @@ class Idea(
     @Column(name = "implementation_guide", columnDefinition = "TEXT")
     var implementationGuide: String? = null,
 
+    @Column(name = "one_liner", columnDefinition = "TEXT")
+    var oneLiner: String? = null,
+
+    @Column(name = "problems", columnDefinition = "TEXT")
+    var problems: String? = null,
+
+    @Column(name = "revenue_model", columnDefinition = "TEXT")
+    var revenueModel: String? = null,
+
+    @Column(name = "strengths", columnDefinition = "TEXT")
+    var strengths: String? = null,
+
+    @Column(name = "risks", columnDefinition = "TEXT")
+    var risks: String? = null,
+
     @Column(name = "star_count", nullable = false)
     var starCount: Int = 0,
 
