@@ -16,36 +16,42 @@ jobs:
     name: Deploy to k3s via SSH
     runs-on: ubuntu-latest
     environment: production
+    permissions:
+      contents: read
+      packages: read
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    env:
+      DEPLOY_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GHCR_USER: ${{ github.actor }}
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Patch image tag in manifest
-        run: |
-          SHA=$(echo "${{ github.event.workflow_run.head_sha || github.sha }}" | cut -c1-7)
-          IMAGE="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${SHA}"
-          sed -i "s|image: .*|image: ${IMAGE}|" k8s/deployment.yaml
-
-      - name: Copy manifest to server
-        uses: appleboy/scp-action@v0.1.7
+      - uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.K8S_SSH_HOST }}
           port: ${{ secrets.K8S_SSH_PORT || 22 }}
           username: ${{ secrets.K8S_SSH_USER }}
           key: ${{ secrets.K8S_SSH_KEY }}
-          source: "k8s/deployment.yaml"
-          target: "/tmp/devbrew-deploy"
-          strip_components: 1
-
-      - name: Apply manifest and wait for rollout
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.K8S_SSH_HOST }}
-          port: ${{ secrets.K8S_SSH_PORT || 22 }}
-          username: ${{ secrets.K8S_SSH_USER }}
-          key: ${{ secrets.K8S_SSH_KEY }}
+          envs: DEPLOY_SHA,GHCR_TOKEN,GHCR_USER
           script: |
-            kubectl apply -f /tmp/devbrew-deploy/deployment.yaml
-            kubectl rollout status deployment/daybrew -n daybrew --timeout=300s
-            rm -f /tmp/devbrew-deploy/deployment.yaml
+            set -euo pipefail
+            kubectl create secret docker-registry ghcr-secret \
+              -n daybrew \
+              --docker-server=ghcr.io \
+              --docker-username="${GHCR_USER}" \
+              --docker-password="${GHCR_TOKEN}" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            curl -fs https://raw.githubusercontent.com/yoon6yo/devbrew-be/${DEPLOY_SHA}/k8s/deployment.yaml \
+              | sed "s|image: ghcr.io/yoon6yo/devbrew-be:.*|image: ghcr.io/yoon6yo/devbrew-be:sha-${DEPLOY_SHA}|" \
+              | kubectl apply -f -
+            kubectl rollout status deployment/daybrew -n daybrew --timeout=300s || {
+              echo "=== ROLLOUT FAILED — DIAGNOSTICS ==="
+              kubectl get pods -n daybrew -o wide
+              echo "--- Pod events ---"
+              kubectl describe pod -n daybrew -l app=daybrew | tail -40
+              echo "--- Previous container logs ---"
+              kubectl logs -n daybrew -l app=daybrew --previous 2>/dev/null | tail -60 || echo "(no previous logs)"
+              echo "--- Current container logs ---"
+              kubectl logs -n daybrew -l app=daybrew 2>/dev/null | tail -60 || echo "(no current logs)"
+              exit 1
+            }
