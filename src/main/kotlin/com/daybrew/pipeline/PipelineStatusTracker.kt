@@ -2,6 +2,7 @@ package com.daybrew.pipeline
 
 import org.springframework.stereotype.Component
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.concurrent.atomic.AtomicReference
 
 private data class Snapshot(
@@ -14,6 +15,10 @@ private data class Snapshot(
     val finishedAt: OffsetDateTime? = null,
     val result: String? = null,
     val error: String? = null,
+    val lastCollectAt: OffsetDateTime? = null,
+    val lastCollectResult: String? = null,
+    val lastScoreAt: OffsetDateTime? = null,
+    val lastScoreResult: String? = null,
 )
 
 data class PipelineStatusDto(
@@ -26,7 +31,20 @@ data class PipelineStatusDto(
     val finishedAt: String?,
     val result: String?,
     val error: String?,
+    val lastCollectAt: String?,
+    val lastCollectResult: String?,
+    val nextCollectAt: String,
+    val lastScoreAt: String?,
+    val lastScoreResult: String?,
+    val nextScoreAt: String,
 )
+
+private fun nextDailyUtc(hour: Int, minute: Int): OffsetDateTime {
+    val now = OffsetDateTime.now(ZoneOffset.UTC)
+    var candidate = now.toLocalDate().atTime(hour, minute).atOffset(ZoneOffset.UTC)
+    if (!candidate.isAfter(now)) candidate = candidate.plusDays(1)
+    return candidate
+}
 
 @Component
 class PipelineStatusTracker {
@@ -43,6 +61,12 @@ class PipelineStatusTracker {
             finishedAt = s.finishedAt?.toString(),
             result = s.result,
             error = s.error,
+            lastCollectAt = s.lastCollectAt?.toString(),
+            lastCollectResult = s.lastCollectResult,
+            nextCollectAt = nextDailyUtc(0, 0).toString(),
+            lastScoreAt = s.lastScoreAt?.toString(),
+            lastScoreResult = s.lastScoreResult,
+            nextScoreAt = nextDailyUtc(0, 30).toString(),
         )
     }
 
@@ -68,5 +92,13 @@ class PipelineStatusTracker {
             result = result,
             error = error,
         )}
+    }
+
+    fun recordCollect(result: String?) {
+        ref.updateAndGet { it.copy(lastCollectAt = OffsetDateTime.now(), lastCollectResult = result) }
+    }
+
+    fun recordScore(result: String?) {
+        ref.updateAndGet { it.copy(lastScoreAt = OffsetDateTime.now(), lastScoreResult = result) }
     }
 }

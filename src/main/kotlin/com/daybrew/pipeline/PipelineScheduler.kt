@@ -97,10 +97,14 @@ class PipelineScheduler(
         }
         try {
             val saved = executeCollect(sources)
-            statusTracker.finish(result = if (saved > 0) "신규 ${saved}개 생성 — 채점 대기중" else "신규 아이디어 없음")
+            val result = if (saved > 0) "신규 ${saved}개 생성 — 채점 대기중" else "신규 아이디어 없음"
+            statusTracker.finish(result = result)
+            statusTracker.recordCollect(result)
         } catch (e: Exception) {
             log.error("Collect step failed", e)
-            statusTracker.finish(error = e.message ?: "알 수 없는 오류")
+            val errMsg = e.message ?: "알 수 없는 오류"
+            statusTracker.finish(error = errMsg)
+            statusTracker.recordCollect("오류: $errMsg")
         }
     }
 
@@ -111,10 +115,14 @@ class PipelineScheduler(
         }
         try {
             val scored = executeScore()
-            statusTracker.finish(result = if (scored > 0) "채점 완료 ${scored}개" else "채점할 아이디어 없음")
+            val result = if (scored > 0) "채점 완료 ${scored}개" else "채점할 아이디어 없음"
+            statusTracker.finish(result = result)
+            statusTracker.recordScore(result)
         } catch (e: Exception) {
             log.error("Score step failed", e)
-            statusTracker.finish(error = e.message ?: "알 수 없는 오류")
+            val errMsg = e.message ?: "알 수 없는 오류"
+            statusTracker.finish(error = errMsg)
+            statusTracker.recordScore("오류: $errMsg")
         }
     }
 
