@@ -41,8 +41,8 @@ class AdminStatsService(
 
         val todayTokens = geminiUsageRepository.sumTotalTokensSince(todayStart)
         val month = geminiUsageRepository.sumTokensSince(monthStart)
-        // Gemini 2.5 Flash Lite: input $0.10/1M, output $0.40/1M
-        val estimatedCost = (month.promptTokens * 0.10 + month.completionTokens * 0.40) / 1_000_000.0
+        // Gemini 2.5 Flash: input $0.15/1M, output $0.60/1M
+        val estimatedCost = (month.promptTokens * 0.15 + month.completionTokens * 0.60) / 1_000_000.0
 
         val pageViews = pageViewsRepository.findTop7ByOrderByViewDateDesc()
             .reversed()

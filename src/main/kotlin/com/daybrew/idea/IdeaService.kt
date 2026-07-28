@@ -111,12 +111,14 @@ class IdeaService(
     @Transactional
     fun restore(id: Long): Idea {
         val idea = getById(id)
-        require(idea.status == IdeaStatus.REJECTED || idea.status == IdeaStatus.FEATURED) {
-            "Only REJECTED or FEATURED ideas can be restored"
+        require(idea.status in listOf(IdeaStatus.REJECTED, IdeaStatus.FEATURED, IdeaStatus.NOTIFIED, IdeaStatus.SCORED)) {
+            "Only REJECTED, FEATURED, NOTIFIED, or SCORED ideas can be restored"
         }
         idea.status = when (idea.status) {
-            IdeaStatus.FEATURED -> IdeaStatus.NOTIFIED
-            else -> if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
+            IdeaStatus.FEATURED  -> IdeaStatus.NOTIFIED
+            IdeaStatus.NOTIFIED  -> IdeaStatus.SCORED
+            IdeaStatus.SCORED    -> IdeaStatus.PENDING
+            else                 -> if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
         }
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)

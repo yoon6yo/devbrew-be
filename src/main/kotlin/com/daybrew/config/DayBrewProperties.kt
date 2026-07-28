@@ -16,7 +16,7 @@ data class DayBrewProperties(
     data class GeminiProps(
         val apiKey: String = "",
         val baseUrl: String = "https://generativelanguage.googleapis.com",
-        val model: String = "gemini-2.5-flash-lite",
+        val model: String = "gemini-2.5-flash",
     )
 
     data class JwtProps(

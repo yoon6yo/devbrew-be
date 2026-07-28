@@ -84,15 +84,15 @@ class AdminStatsServiceTest {
     }
 
     @Test
-    fun `getStats calculates estimated cost using Gemini Flash Lite pricing`() {
-        // 2M prompt tokens @ $0.10/1M = $0.20, 500K completion @ $0.40/1M = $0.20 → total $0.40
+    fun `getStats calculates estimated cost using Gemini Flash pricing`() {
+        // 2M prompt tokens @ $0.15/1M = $0.30, 500K completion @ $0.60/1M = $0.30 → total $0.60
         every { geminiUsageRepository.sumTotalTokensSince(any()) } returns 0L
         every { geminiUsageRepository.sumTokensSince(any()) } returns TokenTotals(2_000_000L, 500_000L, 2_500_000L)
         every { pageViewsRepository.findTop7ByOrderByViewDateDesc() } returns emptyList()
 
         val stats = service.getStats()
 
-        assertThat(stats.gemini.estimatedMonthlyCostUsd).isCloseTo(0.40, offset(0.0001))
+        assertThat(stats.gemini.estimatedMonthlyCostUsd).isCloseTo(0.60, offset(0.0001))
     }
 
     @Test
