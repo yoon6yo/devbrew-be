@@ -24,7 +24,7 @@ class RedditCollector(
         .build()
 
     override fun collect(): List<RawSignal> =
-        subreddits.flatMap { collectSubreddit(it) } +
+        subreddits.flatMap { collectSubreddit(it) + collectSubredditNew(it) } +
         viralSubreddits.flatMap { collectViralSubreddit(it) } +
         collectPainPoints()
 
@@ -43,7 +43,7 @@ class RedditCollector(
                 val encoded = java.net.URLEncoder.encode(query, "UTF-8")
                 @Suppress("UNCHECKED_CAST")
                 val response = client.get()
-                    .uri("/search.json?q=$encoded&sort=relevance&t=month&limit=10&type=link")
+                    .uri("/search.json?q=$encoded&sort=relevance&t=week&limit=10&type=link")
                     .retrieve()
                     .bodyToMono<Map<String, Any>>()
                     .block() ?: return@flatMap emptyList()
@@ -115,6 +115,46 @@ class RedditCollector(
             }
         } catch (e: Exception) {
             log.warn("Reddit collection failed for r/$subreddit: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun collectSubredditNew(subreddit: String): List<RawSignal> {
+        return try {
+            @Suppress("UNCHECKED_CAST")
+            val response = client.get()
+                .uri("/r/$subreddit/new.json?limit=25")
+                .retrieve()
+                .bodyToMono<Map<String, Any>>()
+                .block() ?: return emptyList()
+
+            val children = ((response["data"] as? Map<*, *>)?.get("children") as? List<*>)
+                ?: return emptyList()
+
+            children.mapNotNull { child ->
+                @Suppress("UNCHECKED_CAST")
+                val data = (child as? Map<*, *>)?.get("data") as? Map<String, Any>
+                    ?: return@mapNotNull null
+
+                val title    = data["title"] as? String ?: return@mapNotNull null
+                val selftext = data["selftext"] as? String ?: ""
+                val permalink = data["permalink"] as? String
+
+                if (selftext.length < 100) return@mapNotNull null
+
+                val upvotes = (data["score"] as? Number)?.toInt() ?: 0
+                if (upvotes < 10) return@mapNotNull null
+
+                RawSignal(
+                    title = title,
+                    body = selftext.take(800),
+                    url = permalink?.let { "https://www.reddit.com$it" },
+                    track = SourceTrack.SAAS,
+                    engagementScore = upvotes,
+                )
+            }
+        } catch (e: Exception) {
+            log.warn("Reddit new collection failed for r/$subreddit: ${e.message}")
             emptyList()
         }
     }

@@ -34,18 +34,34 @@ class GithubCollector(
 
     @Suppress("UNCHECKED_CAST")
     private fun collectAbandonedRepos(): List<RawSignal> {
-        val cutoffDate = LocalDate.now().minusYears(abandonedYears).toString() // e.g. 2023-07-28
-        val query = "stars:>$minStars+pushed:<$cutoffDate+archived:false+fork:false"
+        val today = LocalDate.now()
+        val cutoffDate = today.minusYears(abandonedYears).toString()
+        val deepCutoffDate = today.minusYears(abandonedYears + 2).toString()
+        val mediumStarMax = (minStars - 1).coerceAtLeast(100)
 
+        // Three query variants to get diverse repos on each run instead of always the same top list
+        val variants = listOf(
+            Triple("stars:>$minStars+pushed:<$cutoffDate+archived:false+fork:false", "stars", "desc"),
+            Triple("stars:50..$mediumStarMax+pushed:<$cutoffDate+archived:false+fork:false", "stars", "desc"),
+            Triple("stars:>$minStars+pushed:<$deepCutoffDate+archived:false+fork:false", "updated", "desc"),
+        )
+
+        return variants.flatMap { (query, sort, order) ->
+            fetchRepos(query, sort, order)
+        }.distinctBy { it.url }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun fetchRepos(query: String, sort: String, order: String): List<RawSignal> {
         return try {
             val response = client.get()
-                .uri("/search/repositories?q=$query&sort=stars&order=desc&per_page=20")
+                .uri("/search/repositories?q=$query&sort=$sort&order=$order&per_page=20")
                 .retrieve()
                 .bodyToMono<Map<String, Any>>()
                 .block() ?: return emptyList()
 
             val items = response["items"] as? List<*> ?: return emptyList()
-            log.info("GitHub: found ${items.size} abandoned repos (stars>=$minStars, no push since $cutoffDate)")
+            log.info("GitHub: fetched ${items.size} repos (sort=$sort, query prefix=${query.take(40)}…)")
 
             items.mapNotNull { item ->
                 val repo = item as? Map<String, Any> ?: return@mapNotNull null
@@ -75,7 +91,7 @@ class GithubCollector(
                 )
             }
         } catch (e: Exception) {
-            log.warn("GitHub abandoned repo collection failed: ${e.message}")
+            log.warn("GitHub repo collection failed (sort=$sort): ${e.message}")
             emptyList()
         }
     }
