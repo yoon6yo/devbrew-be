@@ -10,6 +10,7 @@ import com.daybrew.llm.IdeaRater
 import com.daybrew.pipeline.collector.IdeaCollector
 import com.daybrew.pipeline.collector.RawSignal
 import com.daybrew.slack.SlackNotifier
+import jakarta.annotation.PostConstruct
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Async
 import org.springframework.scheduling.annotation.Scheduled
@@ -65,6 +66,35 @@ class PipelineScheduler(
             .onFailure { log.warn("Feature selection failed", it) }
             .getOrDefault(emptyList())
         log.info("Feature job complete — featured ${featured.size} ideas")
+    }
+
+    // Recover ideas stuck in SCORING for > 12 h — 06:00 UTC (15:00 KST), retry up to 3 times
+    @Async
+    @Scheduled(cron = "0 0 6 * * *")
+    fun recoverStuckScoringIdeas() = doRecoverStuck()
+
+    @PostConstruct
+    fun recoverOnStartup() {
+        log.info("Startup recovery: checking for stuck SCORING ideas")
+        doRecoverStuck()
+    }
+
+    private fun doRecoverStuck() {
+        val cutoff = OffsetDateTime.now().minusHours(12)
+        val stuck = ideaRepository.findByStatusAndUpdatedAtBefore(IdeaStatus.SCORING, cutoff)
+        if (stuck.isEmpty()) return
+        log.warn("Recovery: found ${stuck.size} stuck SCORING ideas (updatedAt < $cutoff)")
+        stuck.forEach { idea ->
+            runCatching {
+                if (idea.scoreRetryCount >= 3) {
+                    ideaService.rejectStuckIdea(idea.id)
+                    log.warn("Recovery: idea ${idea.id} rejected after ${idea.scoreRetryCount} retries")
+                } else {
+                    ideaService.requeueStuckIdea(idea.id)
+                    log.info("Recovery: idea ${idea.id} re-queued (retry #${idea.scoreRetryCount + 1})")
+                }
+            }.onFailure { log.error("Recovery failed for idea ${idea.id}", it) }
+        }
     }
 
     // Hard-delete REJECTED ideas older than 1 year — 03:30 UTC (12:30 KST)
@@ -210,6 +240,12 @@ class PipelineScheduler(
         log.info("Score started — ${pending.size} PENDING ideas")
         if (pending.isEmpty()) return 0
 
+        // Mark all as SCORING before we call Gemini — enables progress tracking and restart recovery
+        pending.forEach { idea ->
+            runCatching { ideaService.markScoring(idea.id) }
+                .onFailure { log.warn("markScoring failed for idea ${idea.id}", it) }
+        }
+
         statusTracker.update("채점", 1, "${pending.size}개 아이디어 채점 중…")
         val ratings = runCatching { ideaRater.rateAll(pending) }
             .onFailure { log.warn("Batch rating failed", it) }
@@ -217,10 +253,19 @@ class PipelineScheduler(
 
         var scoredCount = 0
         pending.forEach { idea ->
-            val result = ratings[idea.id] ?: return@forEach
+            val result = ratings[idea.id]
+            if (result == null) {
+                // Gemini returned no result for this idea — revert to PENDING for next cycle
+                runCatching { ideaService.revertScoringToPending(idea.id) }
+                    .onFailure { log.warn("revertScoringToPending failed for idea ${idea.id}", it) }
+                return@forEach
+            }
             runCatching { ideaService.updateScore(idea.id, result) }
                 .onSuccess { scoredCount++ }
-                .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+                .onFailure {
+                    log.warn("Score update failed for idea: ${idea.id}", it)
+                    runCatching { ideaService.revertScoringToPending(idea.id) }
+                }
         }
         log.info("Scored $scoredCount/${pending.size} ideas")
         return scoredCount

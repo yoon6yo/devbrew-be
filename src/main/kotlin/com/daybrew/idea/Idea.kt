@@ -79,6 +79,9 @@ class Idea(
     @Column(nullable = false, length = 50)
     var status: IdeaStatus = IdeaStatus.PENDING,
 
+    @Column(name = "score_retry_count", nullable = false)
+    var scoreRetryCount: Int = 0,
+
     @Column(name = "created_at", nullable = false, updatable = false)
     val createdAt: OffsetDateTime = OffsetDateTime.now(),
 
@@ -88,4 +91,4 @@ class Idea(
 
 enum class SourceTrack { SAAS, GITHUB, VIRAL, HACKERNEWS }
 
-enum class IdeaStatus { PENDING, SCORED, NOTIFIED, FEATURED, REJECTED }
+enum class IdeaStatus { PENDING, SCORING, SCORED, NOTIFIED, FEATURED, REJECTED }

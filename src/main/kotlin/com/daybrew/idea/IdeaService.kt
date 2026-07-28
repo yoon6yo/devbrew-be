@@ -47,6 +47,8 @@ class IdeaService(
 
     fun getPending(): List<Idea> = ideaRepository.findByStatus(IdeaStatus.PENDING)
 
+    fun getScoring(): List<Idea> = ideaRepository.findByStatus(IdeaStatus.SCORING)
+
     fun getScored(): List<Idea> = ideaRepository.findByStatus(IdeaStatus.SCORED)
 
     @Transactional
@@ -63,6 +65,41 @@ class IdeaService(
         idea.scoreTrend = result.trend
         idea.scoreReason = result.reason
         idea.status = IdeaStatus.SCORED
+        idea.scoreRetryCount = 0
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
+    fun markScoring(id: Long): Idea {
+        val idea = getById(id)
+        idea.status = IdeaStatus.SCORING
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
+    fun revertScoringToPending(id: Long): Idea {
+        val idea = getById(id)
+        if (idea.status != IdeaStatus.SCORING) return idea
+        idea.status = IdeaStatus.PENDING
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
+    fun requeueStuckIdea(id: Long): Idea {
+        val idea = getById(id)
+        idea.status = IdeaStatus.PENDING
+        idea.scoreRetryCount++
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
+    fun rejectStuckIdea(id: Long): Idea {
+        val idea = getById(id)
+        idea.status = IdeaStatus.REJECTED
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)
     }

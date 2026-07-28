@@ -37,4 +37,6 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
 
     @Query("SELECT i.title FROM Idea i WHERE i.createdAt > :from")
     fun findTitlesByCreatedAtAfter(from: java.time.OffsetDateTime): List<String>
+
+    fun findByStatusAndUpdatedAtBefore(status: IdeaStatus, cutoff: java.time.OffsetDateTime): List<Idea>
 }
