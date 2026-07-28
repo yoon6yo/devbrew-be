@@ -157,8 +157,13 @@ class PipelineScheduler(
             return
         }
         try {
-            val scored = executeScore()
-            val result = if (scored > 0) "채점 완료 ${scored}개" else "채점할 아이디어 없음"
+            val (found, scored) = executeScore()
+            val result = when {
+                found == 0        -> "채점할 아이디어 없음"
+                scored == 0       -> "Gemini 오류 — ${found}개 재시도 대기"
+                scored < found    -> "채점 완료 ${scored}/${found}개"
+                else              -> "채점 완료 ${scored}개"
+            }
             statusTracker.finish(result = result)
             statusTracker.recordScore(result)
         } catch (e: Exception) {
@@ -180,7 +185,7 @@ class PipelineScheduler(
                 statusTracker.finish(result = "신규 아이디어 없음")
                 return
             }
-            val scored = executeScore()
+            val (_, scored) = executeScore()
             statusTracker.finish(result = "신규 ${saved}개, 채점 ${scored}개")
         } catch (e: Exception) {
             log.error("Pipeline failed", e)
@@ -248,10 +253,11 @@ class PipelineScheduler(
         return savedCount
     }
 
-    private fun executeScore(): Int {
+    /** Returns (found, scored) */
+    private fun executeScore(): Pair<Int, Int> {
         val pending = ideaService.getPending()
         log.info("Score started — ${pending.size} PENDING ideas")
-        if (pending.isEmpty()) return 0
+        if (pending.isEmpty()) return 0 to 0
 
         // Mark all as SCORING before we call Gemini — enables progress tracking and restart recovery
         pending.forEach { idea ->
@@ -268,7 +274,6 @@ class PipelineScheduler(
         pending.forEach { idea ->
             val result = ratings[idea.id]
             if (result == null) {
-                // Gemini returned no result for this idea — revert to PENDING for next cycle
                 runCatching { ideaService.revertScoringToPending(idea.id) }
                     .onFailure { log.warn("revertScoringToPending failed for idea ${idea.id}", it) }
                 return@forEach
@@ -281,7 +286,7 @@ class PipelineScheduler(
                 }
         }
         log.info("Scored $scoredCount/${pending.size} ideas")
-        return scoredCount
+        return pending.size to scoredCount
     }
 
     // ── Concept dedup ─────────────────────────────────────────────────────────
