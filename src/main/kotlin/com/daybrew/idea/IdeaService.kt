@@ -84,18 +84,18 @@ class IdeaService(
     }
 
     @Transactional
-    fun selectDailyTopFive(): List<Idea> {
+    fun selectDailyTopFeatured(): List<Idea> {
         val kst = ZoneId.of("Asia/Seoul")
         val todayStart = LocalDate.now(kst).atStartOfDay(kst).toOffsetDateTime()
         val alreadyFeaturedToday = ideaRepository.findByStatusAndUpdatedAtGreaterThanEqual(
             IdeaStatus.FEATURED, todayStart,
             org.springframework.data.domain.PageRequest.of(0, 10),
         ).content
-        if (alreadyFeaturedToday.size >= 5) return alreadyFeaturedToday
+        if (alreadyFeaturedToday.size >= 6) return alreadyFeaturedToday
 
         val candidates = ideaRepository.findByStatus(IdeaStatus.NOTIFIED)
             .sortedByDescending { it.score ?: 0 }
-            .take(5)
+            .take(6)
 
         return candidates.map { markFeatured(it.id) }
     }

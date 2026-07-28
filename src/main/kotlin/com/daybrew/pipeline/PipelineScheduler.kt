@@ -52,8 +52,8 @@ class PipelineScheduler(
             log.info("Publish job complete — notified ${top.size} ideas")
         }
 
-        // NOTIFIED → FEATURED: select today's top 5 for main page
-        val featured = runCatching { ideaService.selectDailyTopFive() }
+        // NOTIFIED → FEATURED: select today's top 6 for main page
+        val featured = runCatching { ideaService.selectDailyTopFeatured() }
             .onFailure { log.warn("Feature selection failed", it) }
             .getOrDefault(emptyList())
         log.info("Feature job complete — featured ${featured.size} ideas")
