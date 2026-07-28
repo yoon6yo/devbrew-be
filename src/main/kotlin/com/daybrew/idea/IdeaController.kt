@@ -167,8 +167,14 @@ class IdeaController(
         return ResponseEntity.ok(ideaService.markNotified(idea.id).toDto())
     }
 
+    @PostMapping("/{id}/feature")
+    @Operation(summary = "아이디어 수동 피처 (관리자 전용) — NOTIFIED → FEATURED")
+    @SecurityRequirement(name = "bearerAuth")
+    fun feature(@PathVariable id: Long): ResponseEntity<IdeaDto> =
+        ResponseEntity.ok(ideaService.markFeatured(id).toDto())
+
     @PostMapping("/{id}/restore")
-    @Operation(summary = "거절된 아이디어 복구 (관리자 전용) — REJECTED → SCORED/PENDING")
+    @Operation(summary = "거절/피처됨 아이디어 복구 (관리자 전용) — REJECTED → SCORED/PENDING, FEATURED → NOTIFIED")
     @SecurityRequirement(name = "bearerAuth")
     fun restore(@PathVariable id: Long): ResponseEntity<IdeaDto> =
         ResponseEntity.ok(ideaService.restore(id).toDto())
