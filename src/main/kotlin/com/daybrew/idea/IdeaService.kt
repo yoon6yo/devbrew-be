@@ -28,6 +28,8 @@ class IdeaService(
         val todayStart = LocalDate.now(kst).atStartOfDay(kst).toOffsetDateTime()
         return when {
             !statuses.isNullOrEmpty() -> ideaRepository.findByStatusIn(statuses, pageable)
+            status != null && today == true && status == IdeaStatus.FEATURED ->
+                ideaRepository.findByStatusAndUpdatedAtGreaterThanEqual(status, todayStart, pageable)
             status != null && today == true -> ideaRepository.findByStatusAndCreatedAtGreaterThanEqual(status, todayStart, pageable)
             status != null && today == false -> ideaRepository.findByStatusAndCreatedAtLessThan(status, todayStart, pageable)
             status != null -> ideaRepository.findByStatus(status, pageable)
@@ -74,6 +76,31 @@ class IdeaService(
     }
 
     @Transactional
+    fun markFeatured(id: Long): Idea {
+        val idea = getById(id)
+        idea.status = IdeaStatus.FEATURED
+        idea.updatedAt = OffsetDateTime.now()
+        return ideaRepository.save(idea)
+    }
+
+    @Transactional
+    fun selectDailyTopFive(): List<Idea> {
+        val kst = ZoneId.of("Asia/Seoul")
+        val todayStart = LocalDate.now(kst).atStartOfDay(kst).toOffsetDateTime()
+        val alreadyFeaturedToday = ideaRepository.findByStatusAndUpdatedAtGreaterThanEqual(
+            IdeaStatus.FEATURED, todayStart,
+            org.springframework.data.domain.PageRequest.of(0, 10),
+        ).content
+        if (alreadyFeaturedToday.size >= 5) return alreadyFeaturedToday
+
+        val candidates = ideaRepository.findByStatus(IdeaStatus.NOTIFIED)
+            .sortedByDescending { it.score ?: 0 }
+            .take(5)
+
+        return candidates.map { markFeatured(it.id) }
+    }
+
+    @Transactional
     fun reject(id: Long): Idea {
         val idea = getById(id)
         idea.status = IdeaStatus.REJECTED
@@ -84,8 +111,13 @@ class IdeaService(
     @Transactional
     fun restore(id: Long): Idea {
         val idea = getById(id)
-        require(idea.status == IdeaStatus.REJECTED) { "Only REJECTED ideas can be restored" }
-        idea.status = if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
+        require(idea.status == IdeaStatus.REJECTED || idea.status == IdeaStatus.FEATURED) {
+            "Only REJECTED or FEATURED ideas can be restored"
+        }
+        idea.status = when (idea.status) {
+            IdeaStatus.FEATURED -> IdeaStatus.NOTIFIED
+            else -> if (idea.score != null) IdeaStatus.SCORED else IdeaStatus.PENDING
+        }
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)
     }

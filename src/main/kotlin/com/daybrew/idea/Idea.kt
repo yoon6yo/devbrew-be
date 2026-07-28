@@ -73,4 +73,4 @@ class Idea(
 
 enum class SourceTrack { SAAS, GITHUB, VIRAL, HACKERNEWS }
 
-enum class IdeaStatus { PENDING, SCORED, NOTIFIED, REJECTED }
+enum class IdeaStatus { PENDING, SCORED, NOTIFIED, FEATURED, REJECTED }

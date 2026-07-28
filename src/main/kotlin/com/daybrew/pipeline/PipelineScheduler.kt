@@ -30,7 +30,7 @@ class PipelineScheduler(
     @Scheduled(cron = "0 0 0 * * *")
     fun runPipeline() = runPipeline(sources = null)
 
-    // Publish top scored ideas daily at midnight KST (15:00 UTC)
+    // Publish top scored ideas daily at midnight KST (15:00 UTC): SCORED → NOTIFIED
     @Async
     @Scheduled(cron = "0 0 15 * * *")
     fun publishTopIdeas() {
@@ -41,18 +41,22 @@ class PipelineScheduler(
 
         if (top.isEmpty()) {
             log.info("Publish job: no scored ideas to publish")
-            return
+        } else {
+            top.forEachIndexed { i, idea ->
+                if (i > 0) Thread.sleep(1_000)
+                runCatching { ideaService.markNotified(idea.id) }
+                    .onFailure { log.warn("Failed to notify idea ${idea.id}", it) }
+                runCatching { slackNotifier.notifyIdea(idea) }
+                    .onFailure { log.warn("Slack ping failed for idea ${idea.id}", it) }
+            }
+            log.info("Publish job complete — notified ${top.size} ideas")
         }
 
-        top.forEachIndexed { i, idea ->
-            if (i > 0) Thread.sleep(1_000)
-            runCatching { ideaService.markNotified(idea.id) }
-                .onFailure { log.warn("Failed to publish idea ${idea.id}", it) }
-            runCatching { slackNotifier.notifyIdea(idea) }
-                .onFailure { log.warn("Slack ping failed for idea ${idea.id}", it) }
-        }
-
-        log.info("Publish job complete — published ${top.size} ideas")
+        // NOTIFIED → FEATURED: select today's top 5 for main page
+        val featured = runCatching { ideaService.selectDailyTopFive() }
+            .onFailure { log.warn("Feature selection failed", it) }
+            .getOrDefault(emptyList())
+        log.info("Feature job complete — featured ${featured.size} ideas")
     }
 
     // Hard-delete REJECTED ideas older than 1 year — runs nightly at 03:30 UTC (12:30 KST)

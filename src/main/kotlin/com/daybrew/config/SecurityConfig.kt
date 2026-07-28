@@ -54,6 +54,15 @@ class SecurityConfig(
                 headers.referrerPolicy {
                     it.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)
                 }
+                // REST API only — minimal CSP; frontend CSP is enforced by nginx
+                headers.contentSecurityPolicy {
+                    it.policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'self'")
+                }
+                headers.addHeaderWriter(
+                    org.springframework.security.web.header.writers.StaticHeadersWriter(
+                        "Permissions-Policy", "camera=(), microphone=(), geolocation=()"
+                    )
+                )
             }
             .sessionManagement { it.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
             .authorizeHttpRequests { auth ->
@@ -69,6 +78,10 @@ class SecurityConfig(
                     .requestMatchers(HttpMethod.GET, "/api/ideas", "/api/ideas/**").permitAll()
                     .requestMatchers(HttpMethod.POST, "/api/ideas/*/star").permitAll()
                     .requestMatchers(HttpMethod.DELETE, "/api/ideas/*/star").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/ideas/*/score").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/ideas/*/notify").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/ideas/*/feature").hasRole("ADMIN")
+                    .requestMatchers(HttpMethod.POST, "/api/ideas/*/restore").hasRole("ADMIN")
                     .requestMatchers(HttpMethod.POST, "/api/ideas/*/reject").hasRole("ADMIN")
                     .requestMatchers("/api/admin/**").hasRole("ADMIN")
                     .anyRequest().authenticated()

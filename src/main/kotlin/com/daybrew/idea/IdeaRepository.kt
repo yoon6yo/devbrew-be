@@ -28,6 +28,8 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
 
     fun findByStatusAndCreatedAtLessThan(status: IdeaStatus, before: java.time.OffsetDateTime, pageable: Pageable): Page<Idea>
 
+    fun findByStatusAndUpdatedAtGreaterThanEqual(status: IdeaStatus, from: java.time.OffsetDateTime, pageable: Pageable): Page<Idea>
+
     @Query("SELECT new com.daybrew.idea.StatusCount(i.status, COUNT(i)) FROM Idea i GROUP BY i.status")
     fun countAllGroupedByStatus(): List<StatusCount>
 
