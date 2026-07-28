@@ -110,35 +110,35 @@ class IdeaServiceTest {
     // ── isDuplicate ──────────────────────────────────────────────────────────
 
     @Test
-    fun `isDuplicate returns true when source URL already exists`() {
-        every { ideaRepository.existsBySourceUrlAndSourceTrack("https://ex.com", SourceTrack.SAAS) } returns true
+    fun `isDuplicate returns true when source URL already exists within 90 days`() {
+        every { ideaRepository.existsBySourceUrlAndSourceTrackAndCreatedAtAfter("https://ex.com", SourceTrack.SAAS, any()) } returns true
         assertThat(service.isDuplicate("https://ex.com", null, SourceTrack.SAAS)).isTrue()
     }
 
     @Test
-    fun `isDuplicate returns false when URL not yet seen`() {
-        every { ideaRepository.existsBySourceUrlAndSourceTrack("https://new.com", SourceTrack.SAAS) } returns false
+    fun `isDuplicate returns false when URL not seen within 90 days`() {
+        every { ideaRepository.existsBySourceUrlAndSourceTrackAndCreatedAtAfter("https://new.com", SourceTrack.SAAS, any()) } returns false
         assertThat(service.isDuplicate("https://new.com", null, SourceTrack.SAAS)).isFalse()
     }
 
     @Test
     fun `isDuplicate checks rawSignal when URL is null`() {
-        every { ideaRepository.existsByRawSignalAndSourceTrack("raw body", SourceTrack.GITHUB) } returns true
+        every { ideaRepository.existsByRawSignalAndSourceTrackAndCreatedAtAfter("raw body", SourceTrack.GITHUB, any()) } returns true
         assertThat(service.isDuplicate(null, "raw body", SourceTrack.GITHUB)).isTrue()
     }
 
     @Test
     fun `isDuplicate returns false when both URL and rawSignal are null`() {
         assertThat(service.isDuplicate(null, null, SourceTrack.SAAS)).isFalse()
-        verify(exactly = 0) { ideaRepository.existsBySourceUrlAndSourceTrack(any(), any()) }
-        verify(exactly = 0) { ideaRepository.existsByRawSignalAndSourceTrack(any(), any()) }
+        verify(exactly = 0) { ideaRepository.existsBySourceUrlAndSourceTrackAndCreatedAtAfter(any(), any(), any()) }
+        verify(exactly = 0) { ideaRepository.existsByRawSignalAndSourceTrackAndCreatedAtAfter(any(), any(), any()) }
     }
 
     @Test
     fun `isDuplicate prefers URL check over rawSignal when both provided`() {
-        every { ideaRepository.existsBySourceUrlAndSourceTrack("https://ex.com", SourceTrack.SAAS) } returns false
+        every { ideaRepository.existsBySourceUrlAndSourceTrackAndCreatedAtAfter("https://ex.com", SourceTrack.SAAS, any()) } returns false
         service.isDuplicate("https://ex.com", "raw body", SourceTrack.SAAS)
-        verify(exactly = 0) { ideaRepository.existsByRawSignalAndSourceTrack(any(), any()) }
+        verify(exactly = 0) { ideaRepository.existsByRawSignalAndSourceTrackAndCreatedAtAfter(any(), any(), any()) }
     }
 
     // ── getStatusCounts ──────────────────────────────────────────────────────

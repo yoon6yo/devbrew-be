@@ -13,9 +13,9 @@ interface IdeaRepository : JpaRepository<Idea, Long> {
 
     fun findByStatus(status: IdeaStatus): List<Idea>
 
-    fun existsBySourceUrlAndSourceTrack(sourceUrl: String, sourceTrack: SourceTrack): Boolean
+    fun existsBySourceUrlAndSourceTrackAndCreatedAtAfter(sourceUrl: String, sourceTrack: SourceTrack, createdAt: java.time.OffsetDateTime): Boolean
 
-    fun existsByRawSignalAndSourceTrack(rawSignal: String, sourceTrack: SourceTrack): Boolean
+    fun existsByRawSignalAndSourceTrackAndCreatedAtAfter(rawSignal: String, sourceTrack: SourceTrack, createdAt: java.time.OffsetDateTime): Boolean
 
     @Query("SELECT i FROM Idea i ORDER BY i.score DESC NULLS LAST, i.createdAt DESC")
     fun findAllOrderedByScore(): List<Idea>

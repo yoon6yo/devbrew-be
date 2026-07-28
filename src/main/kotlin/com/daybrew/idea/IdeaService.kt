@@ -152,9 +152,12 @@ class IdeaService(
         return ideaRepository.save(idea) to true
     }
 
-    fun isDuplicate(sourceUrl: String?, rawSignal: String?, track: SourceTrack): Boolean = when {
-        sourceUrl != null -> ideaRepository.existsBySourceUrlAndSourceTrack(sourceUrl, track)
-        rawSignal != null -> ideaRepository.existsByRawSignalAndSourceTrack(rawSignal, track)
-        else -> false
+    fun isDuplicate(sourceUrl: String?, rawSignal: String?, track: SourceTrack): Boolean {
+        val cutoff = OffsetDateTime.now().minusDays(90)
+        return when {
+            sourceUrl != null -> ideaRepository.existsBySourceUrlAndSourceTrackAndCreatedAtAfter(sourceUrl, track, cutoff)
+            rawSignal != null -> ideaRepository.existsByRawSignalAndSourceTrackAndCreatedAtAfter(rawSignal, track, cutoff)
+            else -> false
+        }
     }
 }
