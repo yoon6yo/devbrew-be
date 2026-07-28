@@ -15,6 +15,7 @@ spec:
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 0
+  minReadySeconds: 5
   selector:
     matchLabels:
       app: daybrew
@@ -23,6 +24,7 @@ spec:
       labels:
         app: daybrew
     spec:
+      terminationGracePeriodSeconds: 35
       containers:
         - name: daybrew
           image: ghcr.io/yoon6yo/devbrew-be:latest
@@ -122,6 +124,10 @@ spec:
                   name: daybrew-secrets
                   key: reddit-client-secret
                   optional: true
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]
           resources:
             requests:
               memory: "384Mi"
