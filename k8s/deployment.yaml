@@ -25,6 +25,8 @@ spec:
         app: daybrew
     spec:
       terminationGracePeriodSeconds: 35
+      imagePullSecrets:
+        - name: ghcr-secret
       containers:
         - name: daybrew
           image: ghcr.io/yoon6yo/devbrew-be:latest

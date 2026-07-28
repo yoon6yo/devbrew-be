@@ -75,19 +75,15 @@ class PipelineScheduler(
 
     @PostConstruct
     fun recoverOnStartup() {
-        // On restart, any idea still in SCORING was left by the previous process — reset all immediately
+        // On restart, any SCORING idea was orphaned by the previous process — just reset to PENDING.
+        // Do NOT increment retryCount here; retries are only counted by the 12-hour scheduled recovery.
         val stuck = ideaRepository.findByStatus(IdeaStatus.SCORING)
         if (stuck.isEmpty()) return
-        log.warn("Startup recovery: resetting ${stuck.size} stuck SCORING ideas to PENDING")
+        log.warn("Startup recovery: resetting ${stuck.size} orphaned SCORING ideas to PENDING")
         stuck.forEach { idea ->
             runCatching {
-                if (idea.scoreRetryCount >= 3) {
-                    ideaService.rejectStuckIdea(idea.id)
-                    log.warn("Startup recovery: idea ${idea.id} rejected after ${idea.scoreRetryCount} retries")
-                } else {
-                    ideaService.requeueStuckIdea(idea.id)
-                    log.info("Startup recovery: idea ${idea.id} re-queued (retry #${idea.scoreRetryCount + 1})")
-                }
+                ideaService.revertScoringToPending(idea.id)
+                log.info("Startup recovery: idea ${idea.id} reset to PENDING")
             }.onFailure { log.error("Startup recovery failed for idea ${idea.id}", it) }
         }
     }
@@ -133,7 +129,7 @@ class PipelineScheduler(
 
     // ── Public step runners ──────────────────────────────────────────────────
 
-    fun runCollect(sources: Set<SourceTrack>?) {
+    fun runCollect(sources: Set<SourceTrack>? = null) {
         if (!statusTracker.start(totalSteps = 3)) {
             log.warn("Pipeline already running — skipping collect trigger (sources={})", sources ?: "ALL")
             return
@@ -174,7 +170,7 @@ class PipelineScheduler(
         }
     }
 
-    fun runPipeline(sources: Set<SourceTrack>?) {
+    fun runPipeline(sources: Set<SourceTrack>? = null) {
         if (!statusTracker.start(totalSteps = 4)) {
             log.warn("Pipeline already running — skipping trigger (sources={})", sources ?: "ALL")
             return

@@ -31,9 +31,19 @@ class PipelineSchedulerTest {
 
     private lateinit var scheduler: PipelineScheduler
 
+    private val stubIdea = Idea(id = 0L, title = "stub", description = "stub", sourceTrack = SourceTrack.SAAS)
+
     @BeforeEach
     fun setUp() {
-        scheduler = PipelineScheduler(listOf(collector), ideaGenerator, ideaRater, ideaService, ideaRepository, slackNotifier, com.daybrew.pipeline.PipelineStatusTracker())
+        scheduler = PipelineScheduler(
+            listOf(collector), ideaGenerator, ideaRater, ideaService, ideaRepository,
+            slackNotifier, PipelineStatusTracker(),
+        )
+        // Default stubs so tests only override what they specifically test
+        every { ideaRepository.findTitlesByCreatedAtAfter(any()) } returns emptyList()
+        every { ideaService.getPending() } returns emptyList()
+        every { ideaService.markScoring(any()) } returns stubIdea
+        every { ideaService.revertScoringToPending(any()) } returns stubIdea
     }
 
     private fun score(s: Int, reason: String) = ScoreResult(
@@ -55,33 +65,38 @@ class PipelineSchedulerTest {
         every { ideaService.isDuplicate("https://example.com", "Body", SourceTrack.SAAS) } returns false
         every { ideaGenerator.generateBatch(listOf(signal)) } returns listOf(GeneratedResult(rawIdea, null))
         every { ideaService.save(rawIdea) } returns savedIdea
+        every { ideaService.getPending() } returns listOf(savedIdea)
+        every { ideaService.markScoring(1L) } returns savedIdea
         every { ideaRater.rateAll(listOf(savedIdea)) } returns mapOf(1L to score(8, "Good"))
         every { ideaService.updateScore(1L, score(8, "Good")) } returns scoredIdea
 
         scheduler.runPipeline()
 
         verify(exactly = 1) { ideaService.save(rawIdea) }
+        verify(exactly = 1) { ideaService.markScoring(1L) }
         verify(exactly = 1) { ideaRater.rateAll(listOf(savedIdea)) }
         verify(exactly = 1) { ideaService.updateScore(1L, score(8, "Good")) }
     }
 
     @Test
-    fun `uses embedded score and skips rateAll`() {
+    fun `ideas with no Gemini rating revert to PENDING`() {
         val signal = RawSignal(title = "S", body = "B", url = null, track = SourceTrack.SAAS)
         val rawIdea = Idea(id = 0L, title = "I", description = "D", sourceTrack = SourceTrack.SAAS)
         val savedIdea = Idea(id = 1L, title = "I", description = "D", sourceTrack = SourceTrack.SAAS)
-        val embedded = score(9, "Excellent")
 
         every { collector.collect() } returns listOf(signal)
         every { ideaService.isDuplicate(null, "B", SourceTrack.SAAS) } returns false
-        every { ideaGenerator.generateBatch(listOf(signal)) } returns listOf(GeneratedResult(rawIdea, embedded))
+        every { ideaGenerator.generateBatch(listOf(signal)) } returns listOf(GeneratedResult(rawIdea, null))
         every { ideaService.save(rawIdea) } returns savedIdea
-        every { ideaService.updateScore(1L, embedded) } returns savedIdea
+        every { ideaService.getPending() } returns listOf(savedIdea)
+        every { ideaService.markScoring(1L) } returns savedIdea
+        every { ideaRater.rateAll(listOf(savedIdea)) } returns emptyMap()
+        every { ideaService.revertScoringToPending(1L) } returns savedIdea
 
         scheduler.runPipeline()
 
-        verify(exactly = 1) { ideaService.updateScore(1L, embedded) }
-        verify(exactly = 0) { ideaRater.rateAll(any()) }
+        verify(exactly = 0) { ideaService.updateScore(any(), any()) }
+        verify(exactly = 1) { ideaService.revertScoringToPending(1L) }
     }
 
     @Test
@@ -90,7 +105,6 @@ class PipelineSchedulerTest {
 
         every { collector.collect() } returns listOf(signal)
         every { ideaService.isDuplicate("https://dup.com", "Body", SourceTrack.SAAS) } returns true
-        every { ideaGenerator.generateBatch(emptyList()) } returns emptyList()
 
         scheduler.runPipeline()
 
@@ -112,7 +126,10 @@ class PipelineSchedulerTest {
         every { ideaGenerator.generate(goodSignal) } returns GeneratedResult(goodIdea, null)
         every { ideaGenerator.generate(badSignal) } throws RuntimeException("Gemini error")
         every { ideaService.save(goodIdea) } returns savedIdea
+        every { ideaService.getPending() } returns listOf(savedIdea)
+        every { ideaService.markScoring(3L) } returns savedIdea
         every { ideaRater.rateAll(listOf(savedIdea)) } returns emptyMap()
+        every { ideaService.revertScoringToPending(3L) } returns savedIdea
 
         scheduler.runPipeline()
 
@@ -129,7 +146,10 @@ class PipelineSchedulerTest {
         every { ideaService.isDuplicate(null, "B", SourceTrack.SAAS) } returns false
         every { ideaGenerator.generateBatch(listOf(signal)) } returns listOf(GeneratedResult(rawIdea, null))
         every { ideaService.save(rawIdea) } returns savedIdea
+        every { ideaService.getPending() } returns listOf(savedIdea)
+        every { ideaService.markScoring(5L) } returns savedIdea
         every { ideaRater.rateAll(listOf(savedIdea)) } throws RuntimeException("API down")
+        every { ideaService.revertScoringToPending(5L) } returns savedIdea
 
         scheduler.runPipeline()
 
@@ -139,7 +159,6 @@ class PipelineSchedulerTest {
     @Test
     fun `empty signal list skips all pipeline steps`() {
         every { collector.collect() } returns emptyList()
-        every { ideaGenerator.generateBatch(emptyList()) } returns emptyList()
 
         scheduler.runPipeline()
 
