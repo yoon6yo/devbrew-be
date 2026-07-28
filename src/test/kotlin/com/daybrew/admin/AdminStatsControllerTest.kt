@@ -20,7 +20,7 @@ class AdminStatsControllerTest {
 
     @BeforeEach
     fun setUp() {
-        controller = AdminStatsController(adminStatsService, pipelineScheduler)
+        controller = AdminStatsController(adminStatsService, pipelineScheduler, com.daybrew.pipeline.PipelineStatusTracker())
     }
 
     private fun statsDto() = AdminStatsDto(
@@ -68,7 +68,7 @@ class AdminStatsControllerTest {
 
     @Test
     fun `triggerPipeline returns 202 Accepted`() {
-        justRun { pipelineScheduler.runPipeline(null) }
+        justRun { pipelineScheduler.triggerAsync(null) }
 
         val response = controller.triggerPipeline(null)
 
@@ -77,7 +77,7 @@ class AdminStatsControllerTest {
 
     @Test
     fun `triggerPipeline returns Pipeline started message`() {
-        justRun { pipelineScheduler.runPipeline(null) }
+        justRun { pipelineScheduler.triggerAsync(null) }
 
         val response = controller.triggerPipeline(null)
 
@@ -88,7 +88,7 @@ class AdminStatsControllerTest {
     @Test
     fun `triggerPipeline responds immediately without waiting for pipeline completion`() {
         val started = CountDownLatch(1)
-        every { pipelineScheduler.runPipeline(null) } answers {
+        every { pipelineScheduler.triggerAsync(null) } answers {
             started.countDown()
             Thread.sleep(500)
         }
@@ -103,7 +103,7 @@ class AdminStatsControllerTest {
 
     @Test
     fun `triggerPipeline response body contains only message key`() {
-        justRun { pipelineScheduler.runPipeline(null) }
+        justRun { pipelineScheduler.triggerAsync(null) }
 
         val response = controller.triggerPipeline(null)
 

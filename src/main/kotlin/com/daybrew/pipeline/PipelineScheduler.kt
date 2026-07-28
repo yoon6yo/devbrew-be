@@ -21,6 +21,7 @@ class PipelineScheduler(
     private val ideaService: IdeaService,
     private val ideaRepository: IdeaRepository,
     private val slackNotifier: SlackNotifier,
+    private val statusTracker: PipelineStatusTracker,
 ) {
 
     private val log = LoggerFactory.getLogger(javaClass)
@@ -68,65 +69,80 @@ class PipelineScheduler(
         log.info("Hard-delete job: removed $deleted REJECTED ideas older than 1 year")
     }
 
+    @Async
+    fun triggerAsync(sources: Set<SourceTrack>?) = runPipeline(sources)
+
     fun runPipeline(sources: Set<SourceTrack>?) {
-        log.info("Pipeline started — sources={}", sources ?: "ALL")
-        val signals = collectors.flatMap { it.collect() }
-            .let { all -> if (sources != null) all.filter { it.track in sources } else all }
-        log.info("Collected ${signals.size} raw signals (pre-filtered by engagement)")
+        statusTracker.start()
+        try {
+            log.info("Pipeline started — sources={}", sources ?: "ALL")
 
-        val uniqueSignals = signals.filter { signal ->
-            !ideaService.isDuplicate(signal.url, signal.body, signal.track)
-        }
-        log.info("Unique signals after dedup: ${uniqueSignals.size}")
+            statusTracker.update("신호 수집", 1, "소스에서 신호 수집 중…")
+            val signals = collectors.flatMap { it.collect() }
+                .let { all -> if (sources != null) all.filter { it.track in sources } else all }
+            log.info("Collected ${signals.size} raw signals (pre-filtered by engagement)")
 
-        val results = runCatching { ideaGenerator.generateBatch(uniqueSignals) }
-            .onFailure { log.warn("Batch generation failed, retrying individually", it) }
-            .getOrElse {
-                uniqueSignals.mapNotNull { signal ->
-                    runCatching { ideaGenerator.generate(signal) }
-                        .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
-                        .getOrNull()
+            statusTracker.update("중복 제거", 2, "${signals.size}개 신호 중복 제거 중…")
+            val uniqueSignals = signals.filter { signal ->
+                !ideaService.isDuplicate(signal.url, signal.body, signal.track)
+            }
+            log.info("Unique signals after dedup: ${uniqueSignals.size}")
+
+            statusTracker.update("아이디어 생성", 3, "${uniqueSignals.size}개 신호 → Gemini 생성 중…")
+            val results = runCatching { ideaGenerator.generateBatch(uniqueSignals) }
+                .onFailure { log.warn("Batch generation failed, retrying individually", it) }
+                .getOrElse {
+                    uniqueSignals.mapNotNull { signal ->
+                        runCatching { ideaGenerator.generate(signal) }
+                            .onFailure { log.warn("Generation failed for signal: ${signal.title}", it) }
+                            .getOrNull()
+                    }
+                }
+
+            val savedWithScore = results.map { result ->
+                val saved = ideaService.save(result.idea)
+                saved to result.score
+            }
+            log.info("Saved ${savedWithScore.size} new ideas")
+
+            if (savedWithScore.isEmpty()) {
+                statusTracker.finish(result = "신규 아이디어 없음")
+                log.info("Pipeline complete — no new ideas")
+                return
+            }
+
+            statusTracker.update("채점", 4, "${savedWithScore.size}개 아이디어 채점 중…")
+            val needsRating = mutableListOf<com.daybrew.idea.Idea>()
+            var scoredCount = 0
+
+            savedWithScore.forEach { (idea, score) ->
+                if (score != null) {
+                    runCatching { ideaService.updateScore(idea.id, score) }
+                        .onSuccess { scoredCount++ }
+                        .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+                } else {
+                    needsRating += idea
                 }
             }
 
-        val savedWithScore = results.map { result ->
-            val saved = ideaService.save(result.idea)
-            saved to result.score
-        }
-
-        log.info("Saved ${savedWithScore.size} new ideas")
-        if (savedWithScore.isEmpty()) {
-            log.info("Pipeline complete — no new ideas")
-            return
-        }
-
-        // apply embedded scores; fall back to rateAll only for parse failures
-        val needsRating = mutableListOf<com.daybrew.idea.Idea>()
-        var scoredCount = 0
-
-        savedWithScore.forEach { (idea, score) ->
-            if (score != null) {
-                runCatching { ideaService.updateScore(idea.id, score) }
-                    .onSuccess { scoredCount++ }
-                    .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
-            } else {
-                needsRating += idea
+            if (needsRating.isNotEmpty()) {
+                log.info("Fallback rating for ${needsRating.size} ideas without embedded score")
+                val ratings = runCatching { ideaRater.rateAll(needsRating) }
+                    .onFailure { log.warn("Fallback batch rating failed", it) }
+                    .getOrDefault(emptyMap())
+                needsRating.forEach { idea ->
+                    val result = ratings[idea.id] ?: return@forEach
+                    runCatching { ideaService.updateScore(idea.id, result) }
+                        .onSuccess { scoredCount++ }
+                        .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
+                }
             }
-        }
 
-        if (needsRating.isNotEmpty()) {
-            log.info("Fallback rating for ${needsRating.size} ideas without embedded score")
-            val ratings = runCatching { ideaRater.rateAll(needsRating) }
-                .onFailure { log.warn("Fallback batch rating failed", it) }
-                .getOrDefault(emptyMap())
-            needsRating.forEach { idea ->
-                val result = ratings[idea.id] ?: return@forEach
-                runCatching { ideaService.updateScore(idea.id, result) }
-                    .onSuccess { scoredCount++ }
-                    .onFailure { log.warn("Score update failed for idea: ${idea.id}", it) }
-            }
+            statusTracker.finish(result = "신규 ${savedWithScore.size}개, 채점 ${scoredCount}개")
+            log.info("Pipeline complete — scored=$scoredCount, fallback=${needsRating.size}")
+        } catch (e: Exception) {
+            log.error("Pipeline failed", e)
+            statusTracker.finish(error = e.message ?: "알 수 없는 오류")
         }
-
-        log.info("Pipeline complete — scored=$scoredCount, fallback=${needsRating.size}")
     }
 }

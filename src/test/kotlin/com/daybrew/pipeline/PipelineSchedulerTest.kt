@@ -33,7 +33,7 @@ class PipelineSchedulerTest {
 
     @BeforeEach
     fun setUp() {
-        scheduler = PipelineScheduler(listOf(collector), ideaGenerator, ideaRater, ideaService, ideaRepository, slackNotifier)
+        scheduler = PipelineScheduler(listOf(collector), ideaGenerator, ideaRater, ideaService, ideaRepository, slackNotifier, com.daybrew.pipeline.PipelineStatusTracker())
     }
 
     private fun score(s: Int, reason: String) = ScoreResult(
