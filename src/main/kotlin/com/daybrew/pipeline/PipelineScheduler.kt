@@ -75,8 +75,21 @@ class PipelineScheduler(
 
     @PostConstruct
     fun recoverOnStartup() {
-        log.info("Startup recovery: checking for stuck SCORING ideas")
-        doRecoverStuck()
+        // On restart, any idea still in SCORING was left by the previous process — reset all immediately
+        val stuck = ideaRepository.findByStatus(IdeaStatus.SCORING)
+        if (stuck.isEmpty()) return
+        log.warn("Startup recovery: resetting ${stuck.size} stuck SCORING ideas to PENDING")
+        stuck.forEach { idea ->
+            runCatching {
+                if (idea.scoreRetryCount >= 3) {
+                    ideaService.rejectStuckIdea(idea.id)
+                    log.warn("Startup recovery: idea ${idea.id} rejected after ${idea.scoreRetryCount} retries")
+                } else {
+                    ideaService.requeueStuckIdea(idea.id)
+                    log.info("Startup recovery: idea ${idea.id} re-queued (retry #${idea.scoreRetryCount + 1})")
+                }
+            }.onFailure { log.error("Startup recovery failed for idea ${idea.id}", it) }
+        }
     }
 
     private fun doRecoverStuck() {
