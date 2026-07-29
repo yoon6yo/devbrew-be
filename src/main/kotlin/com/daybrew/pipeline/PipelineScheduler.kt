@@ -1,5 +1,6 @@
 package com.daybrew.pipeline
 
+import com.daybrew.idea.Idea
 import com.daybrew.idea.IdeaRepository
 import com.daybrew.idea.IdeaService
 import com.daybrew.idea.IdeaStatus
@@ -128,7 +129,7 @@ class PipelineScheduler(
     fun triggerCollectAsync(sources: Set<SourceTrack>?) = runCollect(sources)
 
     @Async
-    fun triggerScoreAsync() = runScore()
+    fun triggerScoreAsync() = runScore(reScore = true)
 
     // ── Public step runners ──────────────────────────────────────────────────
 
@@ -147,18 +148,30 @@ class PipelineScheduler(
         }
     }
 
-    fun runScore() {
+    // reScore=true: manual trigger — falls back to SCORED ideas when no PENDING exist
+    // reScore=false: scheduled trigger — PENDING only
+    fun runScore(reScore: Boolean = false) {
         if (!statusTracker.start(totalSteps = 1)) {
             log.warn("Pipeline already running — skipping score trigger")
             return
         }
         try {
-            val (found, scored) = executeScore()
+            val pending = ideaService.getPending()
+            val (candidates, isReScore) = when {
+                pending.isNotEmpty() -> pending to false
+                reScore -> {
+                    val scored = ideaService.getScored()
+                    log.info("No PENDING ideas — re-scoring ${scored.size} SCORED ideas")
+                    scored to true
+                }
+                else -> emptyList<Idea>() to false
+            }
+            val (found, scored) = executeScore(candidates)
             val result = when {
-                found == 0        -> "채점할 아이디어 없음"
-                scored == 0       -> "Gemini 오류 — ${found}개 재시도 대기"
-                scored < found    -> "채점 완료 ${scored}/${found}개"
-                else              -> "채점 완료 ${scored}개"
+                found == 0     -> "채점할 아이디어 없음"
+                scored == 0    -> "Gemini 오류 — ${found}개 재시도 대기"
+                scored < found -> "${if (isReScore) "재채점" else "채점"} 완료 ${scored}/${found}개"
+                else           -> "${if (isReScore) "재채점" else "채점"} 완료 ${scored}개"
             }
             statusTracker.finishAndRecordScore(result)
         } catch (e: Exception) {
@@ -178,7 +191,7 @@ class PipelineScheduler(
                 statusTracker.finish(result = "신규 아이디어 없음")
                 return
             }
-            val (_, scored) = executeScore()
+            val (_, scored) = executeScore(ideaService.getPending())
             statusTracker.finish(result = "신규 ${saved}개, 채점 ${scored}개")
         } catch (e: Exception) {
             log.error("Pipeline failed", e)
@@ -247,21 +260,20 @@ class PipelineScheduler(
     }
 
     /** Returns (found, scored) */
-    private fun executeScore(): Pair<Int, Int> {
-        val pending = ideaService.getPending()
-        log.info("Score started — ${pending.size} PENDING ideas")
-        if (pending.isEmpty()) return 0 to 0
+    private fun executeScore(candidates: List<Idea>): Pair<Int, Int> {
+        log.info("Score started — ${candidates.size} ideas")
+        if (candidates.isEmpty()) return 0 to 0
 
-        // Mark all as SCORING; skip any idea where markScoring fails so they stay PENDING
-        // and are naturally retried on the next score run rather than jumping PENDING→SCORED.
-        val toScore = pending.filter { idea ->
+        // Mark all as SCORING; skip any idea where markScoring fails so they stay in their
+        // current status and are naturally retried rather than jumping directly to SCORED.
+        val toScore = candidates.filter { idea ->
             runCatching { ideaService.markScoring(idea.id) }
                 .onFailure { log.warn("markScoring failed for idea ${idea.id}, will retry next run", it) }
                 .isSuccess
         }
         if (toScore.isEmpty()) {
             log.warn("All markScoring calls failed — no ideas eligible for rating this run")
-            return pending.size to 0
+            return candidates.size to 0
         }
 
         statusTracker.update("채점", 1, "${toScore.size}개 아이디어 채점 중…")
@@ -284,8 +296,8 @@ class PipelineScheduler(
                     runCatching { ideaService.revertScoringToPending(idea.id) }
                 }
         }
-        log.info("Scored $scoredCount/${toScore.size} ideas (of ${pending.size} total pending)")
-        return pending.size to scoredCount
+        log.info("Scored $scoredCount/${toScore.size} ideas (of ${candidates.size} total)")
+        return candidates.size to scoredCount
     }
 
     // ── Concept dedup ─────────────────────────────────────────────────────────
