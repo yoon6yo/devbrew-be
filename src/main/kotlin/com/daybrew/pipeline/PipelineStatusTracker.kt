@@ -102,11 +102,61 @@ class PipelineStatusTracker {
         )}
     }
 
-    fun recordCollect(result: String?) {
-        ref.updateAndGet { it.copy(lastCollectAt = OffsetDateTime.now(), lastCollectResult = result) }
+    fun finishAndRecordCollect(result: String) {
+        ref.updateAndGet { s ->
+            s.copy(
+                running = false,
+                step = "완료",
+                stepIndex = s.totalSteps,
+                finishedAt = OffsetDateTime.now(),
+                result = result,
+                error = null,
+                lastCollectAt = OffsetDateTime.now(),
+                lastCollectResult = result,
+            )
+        }
     }
 
-    fun recordScore(result: String?) {
-        ref.updateAndGet { it.copy(lastScoreAt = OffsetDateTime.now(), lastScoreResult = result) }
+    fun finishCollectError(errMsg: String) {
+        ref.updateAndGet { s ->
+            s.copy(
+                running = false,
+                step = "오류",
+                finishedAt = OffsetDateTime.now(),
+                result = null,
+                error = errMsg,
+                lastCollectAt = OffsetDateTime.now(),
+                lastCollectResult = "오류: $errMsg",
+            )
+        }
+    }
+
+    fun finishAndRecordScore(result: String) {
+        ref.updateAndGet { s ->
+            s.copy(
+                running = false,
+                step = "완료",
+                stepIndex = s.totalSteps,
+                finishedAt = OffsetDateTime.now(),
+                result = result,
+                error = null,
+                lastScoreAt = OffsetDateTime.now(),
+                lastScoreResult = result,
+            )
+        }
+    }
+
+    fun finishScoreError(errMsg: String) {
+        ref.updateAndGet { s ->
+            s.copy(
+                running = false,
+                step = "오류",
+                finishedAt = OffsetDateTime.now(),
+                result = null,
+                error = errMsg,
+                lastScoreAt = OffsetDateTime.now(),
+                lastScoreResult = "오류: $errMsg",
+            )
+        }
     }
 }

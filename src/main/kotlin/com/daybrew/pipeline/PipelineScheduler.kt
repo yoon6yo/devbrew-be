@@ -30,10 +30,13 @@ class PipelineScheduler(
 
     private val log = LoggerFactory.getLogger(javaClass)
 
-    // Collect + generate at 09:00 KST (00:00 UTC)
+    // Collect + generate at 09:00 KST (00:00 UTC), then immediately chain into score
     @Async
     @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
-    fun scheduledCollect() = runCollect(sources = null)
+    fun scheduledCollect() {
+        runCollect(sources = null)
+        runScore()
+    }
 
     // Score all PENDING at 09:30 KST (00:30 UTC) — runs after collect completes
     @Async
@@ -137,13 +140,10 @@ class PipelineScheduler(
         try {
             val saved = executeCollect(sources)
             val result = if (saved > 0) "신규 ${saved}개 생성 — 채점 대기중" else "신규 아이디어 없음"
-            statusTracker.finish(result = result)
-            statusTracker.recordCollect(result)
+            statusTracker.finishAndRecordCollect(result)
         } catch (e: Exception) {
             log.error("Collect step failed", e)
-            val errMsg = e.message ?: "알 수 없는 오류"
-            statusTracker.finish(error = errMsg)
-            statusTracker.recordCollect("오류: $errMsg")
+            statusTracker.finishCollectError(e.message ?: "알 수 없는 오류")
         }
     }
 
@@ -160,13 +160,10 @@ class PipelineScheduler(
                 scored < found    -> "채점 완료 ${scored}/${found}개"
                 else              -> "채점 완료 ${scored}개"
             }
-            statusTracker.finish(result = result)
-            statusTracker.recordScore(result)
+            statusTracker.finishAndRecordScore(result)
         } catch (e: Exception) {
             log.error("Score step failed", e)
-            val errMsg = e.message ?: "알 수 없는 오류"
-            statusTracker.finish(error = errMsg)
-            statusTracker.recordScore("오류: $errMsg")
+            statusTracker.finishScoreError(e.message ?: "알 수 없는 오류")
         }
     }
 
@@ -255,19 +252,25 @@ class PipelineScheduler(
         log.info("Score started — ${pending.size} PENDING ideas")
         if (pending.isEmpty()) return 0 to 0
 
-        // Mark all as SCORING before we call Gemini — enables progress tracking and restart recovery
-        pending.forEach { idea ->
+        // Mark all as SCORING; skip any idea where markScoring fails so they stay PENDING
+        // and are naturally retried on the next score run rather than jumping PENDING→SCORED.
+        val toScore = pending.filter { idea ->
             runCatching { ideaService.markScoring(idea.id) }
-                .onFailure { log.warn("markScoring failed for idea ${idea.id}", it) }
+                .onFailure { log.warn("markScoring failed for idea ${idea.id}, will retry next run", it) }
+                .isSuccess
+        }
+        if (toScore.isEmpty()) {
+            log.warn("All markScoring calls failed — no ideas eligible for rating this run")
+            return pending.size to 0
         }
 
-        statusTracker.update("채점", 1, "${pending.size}개 아이디어 채점 중…")
-        val ratings = runCatching { ideaRater.rateAll(pending) }
+        statusTracker.update("채점", 1, "${toScore.size}개 아이디어 채점 중…")
+        val ratings = runCatching { ideaRater.rateAll(toScore) }
             .onFailure { log.warn("Batch rating failed", it) }
             .getOrDefault(emptyMap())
 
         var scoredCount = 0
-        pending.forEach { idea ->
+        toScore.forEach { idea ->
             val result = ratings[idea.id]
             if (result == null) {
                 runCatching { ideaService.revertScoringToPending(idea.id) }
@@ -281,7 +284,7 @@ class PipelineScheduler(
                     runCatching { ideaService.revertScoringToPending(idea.id) }
                 }
         }
-        log.info("Scored $scoredCount/${pending.size} ideas")
+        log.info("Scored $scoredCount/${toScore.size} ideas (of ${pending.size} total pending)")
         return pending.size to scoredCount
     }
 

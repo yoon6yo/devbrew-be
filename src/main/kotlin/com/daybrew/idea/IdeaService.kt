@@ -90,6 +90,7 @@ class IdeaService(
     @Transactional
     fun requeueStuckIdea(id: Long): Idea {
         val idea = getById(id)
+        if (idea.status != IdeaStatus.SCORING) return idea
         idea.status = IdeaStatus.PENDING
         idea.scoreRetryCount++
         idea.updatedAt = OffsetDateTime.now()
@@ -166,6 +167,7 @@ class IdeaService(
             idea.scoreMonetization = null
             idea.scoreTrend = null
             idea.scoreReason = null
+            idea.scoreRetryCount = 0
         }
         idea.updatedAt = OffsetDateTime.now()
         return ideaRepository.save(idea)
