@@ -79,7 +79,7 @@ class Idea(
     @Column(nullable = false, length = 50)
     var status: IdeaStatus = IdeaStatus.PENDING,
 
-    @Column(name = "score_retry_count", nullable = false)
+    @Column(name = "score_retry_count", nullable = false, columnDefinition = "INTEGER NOT NULL DEFAULT 0")
     var scoreRetryCount: Int = 0,
 
     @Column(name = "created_at", nullable = false, updatable = false)

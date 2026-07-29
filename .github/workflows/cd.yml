@@ -49,9 +49,10 @@ jobs:
               kubectl get pods -n daybrew -o wide
               echo "--- Pod events ---"
               kubectl describe pod -n daybrew -l app=daybrew | tail -40
-              echo "--- Previous container logs ---"
-              kubectl logs -n daybrew -l app=daybrew --previous 2>/dev/null | tail -60 || echo "(no previous logs)"
-              echo "--- Current container logs ---"
-              kubectl logs -n daybrew -l app=daybrew 2>/dev/null | tail -60 || echo "(no current logs)"
+              POD=$(kubectl get pod -n daybrew -l app=daybrew -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+              echo "--- Previous container logs (pod: $POD) ---"
+              kubectl logs -n daybrew "$POD" --previous 2>/dev/null | tail -200 || echo "(no previous logs)"
+              echo "--- Current container logs (pod: $POD) ---"
+              kubectl logs -n daybrew "$POD" 2>/dev/null | tail -200 || echo "(no current logs)"
               exit 1
             }
