@@ -32,17 +32,17 @@ class PipelineScheduler(
 
     // Collect + generate at 09:00 KST (00:00 UTC)
     @Async
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *", zone = "UTC")
     fun scheduledCollect() = runCollect(sources = null)
 
     // Score all PENDING at 09:30 KST (00:30 UTC) — runs after collect completes
     @Async
-    @Scheduled(cron = "0 30 0 * * *")
+    @Scheduled(cron = "0 30 0 * * *", zone = "UTC")
     fun scheduledScore() = runScore()
 
     // Publish top scored ideas at midnight KST (15:00 UTC): SCORED → NOTIFIED → FEATURED
     @Async
-    @Scheduled(cron = "0 0 15 * * *")
+    @Scheduled(cron = "0 0 15 * * *", zone = "UTC")
     fun publishTopIdeas() {
         val top = ideaService.getScored()
             .filter { (it.score ?: 0) >= 6 }
@@ -70,7 +70,7 @@ class PipelineScheduler(
 
     // Recover ideas stuck in SCORING for > 12 h — 06:00 UTC (15:00 KST), retry up to 3 times
     @Async
-    @Scheduled(cron = "0 0 6 * * *")
+    @Scheduled(cron = "0 0 6 * * *", zone = "UTC")
     fun recoverStuckScoringIdeas() = doRecoverStuck()
 
     @PostConstruct
@@ -108,7 +108,7 @@ class PipelineScheduler(
 
     // Hard-delete REJECTED ideas older than 1 year — 03:30 UTC (12:30 KST)
     @Async
-    @Scheduled(cron = "0 30 3 * * *")
+    @Scheduled(cron = "0 30 3 * * *", zone = "UTC")
     fun hardDeleteRejected() {
         val cutoff = OffsetDateTime.now().minusYears(1)
         val deleted = ideaRepository.deleteByStatusAndUpdatedAtBefore(IdeaStatus.REJECTED, cutoff)
